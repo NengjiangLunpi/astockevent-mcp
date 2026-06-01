@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AStockEvent · 系统报告</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+<style>
+  :root { --pico-font-size: 93.75%; }
+  body { max-width: 960px; margin: 0 auto; padding: 0 1rem; }
+  header { padding: 1.5rem 0 0.5rem; position: relative; }
+  .theme-toggle { position: absolute; top: 1.5rem; right: 0; background: none; border: 1px solid var(--pico-muted-border-color); border-radius: 8px; padding: 0.3rem 0.5rem; cursor: pointer; font-size: 1.1rem; line-height: 1; }
+  header h1 { font-size: 1.3rem; margin-bottom: 0.2rem; }
+  header nav a { font-size: 0.8rem; margin-right: 1rem; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .card { margin-bottom: 1rem; }
+  .card h3 { margin-bottom: 0.5rem; font-size: 0.95rem; }
+  .bar-wrap { background: var(--pico-muted-border-color); border-radius: 4px; height: 20px; overflow: hidden; margin: 0.3rem 0; }
+  .bar-fill { height: 100%; border-radius: 4px; }
+  .stat-num { font-size: 1.5rem; font-weight: 700; }
+  .stat-label { font-size: 0.75rem; color: var(--pico-muted-color); }
+  .login-box { max-width: 320px; margin: 4rem auto; text-align: center; }
+  footer { text-align: center; padding: 2rem 0; font-size: 0.75rem; color: var(--pico-muted-color); }
+  .badge-sm { font-size: 0.7rem; padding: 0.08rem 0.4rem; border-radius: 3px; }
+  .bg-ok { background: #d5f5e3; color: #1e8449; }
+  .bg-warn { background: #fef9e7; color: #b7950b; }
+  .bg-err { background: #fadbd8; color: #922b21; }
+  @media (max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <button class="theme-toggle" id="themeToggle" title="切换深色模式" aria-label="切换深色模式">🌙</button>
+  <h1>AStockEvent</h1>
+  <nav><a href="/">看板</a><a href="/admin">管理</a><a href="/status">状态</a><a href="/report">报告</a><a href="/review">审核</a></nav>
+</header>
+<main id="main">
+  <div class="loading">加载中...</div>
+</main>
+<footer>AStockEvent Admin · 仅限授权访问</footer>
+<div id="loginForm" style="display:none">
+  <div class="login-box">
+    <h3>管理员登录</h3>
+    <form id="authForm">
+      <input type="text" id="username" placeholder="用户名" required>
+      <input type="password" id="password" placeholder="密码" required>
+      <button type="submit">登录</button>
+    </form>
+  </div>
+</div>
+<script>
+var AUTH_KEY = 'dp_admin_auth';
+
+function getAuth() {
+  return sessionStorage.getItem(AUTH_KEY);
+}
+
+function setAuth(u, p) {
+  sessionStorage.setItem(AUTH_KEY, 'Basic ' + btoa(u + ':' + p));
+}
+
+function apiFetch(url) {
+  var headers = {};
+  var auth = getAuth();
+  if (auth) headers['Authorization'] = auth;
+  return fetch(url, { headers: headers }).then(function(r) {
+    if (r.status === 401) { sessionStorage.removeItem(AUTH_KEY); showLogin(); throw new Error('unauthorized'); }
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  });
+}
+
+function showLogin() {
+  document.getElementById('main').innerHTML = '';
+  document.getElementById('loginForm').style.display = 'block';
+}
+
+document.getElementById('authForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  var u = document.getElementById('username').value;
+  var p = document.getElementById('password').value;
+  setAuth(u, p);
+  document.getElementById('loginForm').style.display = 'none';
+  load();
+});
+
+var TYPE_COLORS = {
+  share_reduction: '#c0392b', delisting_risk: '#8e1a1a', regulatory_letter: '#d35400',
+  lockup_expiration: '#2471a3', share_buyback: '#1e8449'
+};
+var TYPE_NAMES = {
+  share_reduction: '减持', delisting_risk: 'ST/退市', regulatory_letter: '监管函',
+  lockup_expiration: '解禁', share_buyback: '回购'
+};
+var CONF_COLORS = { verified: '#27ae60', likely: '#f1c40f', uncertain: '#e74c3c' };
+var CONF_NAMES = { verified: '已核实', likely: '未核实', uncertain: '不确定' };
+
+function load() {
+  var main = document.getElementById('main');
+  main.innerHTML = '<div class="loading">加载中...</div>';
+
+  apiFetch('/api/report').then(function(d) {
+    var html = '<p style="color:var(--pico-muted-color);font-size:0.8rem">生成时间: ' + d.generated_at + ' · 统计周期: 24h</p>';
+
+    // summary cards
+    html += '<div class="grid-2">' +
+      statCard('Event 总数', d.total_events || 0, '') +
+      statCard('24h 新公告', d.raw_announcements_24h || 0, '') +
+      statCard('管线周期', d.pipeline_cycles || 0, '') +
+      statCard('错误', d.errors || 0, d.errors > 3 ? 'bg-err' : 'bg-ok') +
+      '</div>';
+
+    // event type breakdown
+    html += '<article class="card"><h3>Event 类型分布 (24h)</h3>';
+    var et = d.event_type_breakdown || {};
+    var keys = Object.keys(et);
+    if (keys.length) {
+      var maxEt = Math.max.apply(null, keys.map(function(k) { return et[k]; }));
+      for (var i = 0; i < keys.length; i++) {
+        var k = keys[i], v = et[k];
+        var pct = Math.round(v / maxEt * 100);
+        html += '<div style="margin-bottom:0.4rem">' +
+          '<span style="font-size:0.82rem">' + (TYPE_NAMES[k] || k) + ' <strong>' + v + '</strong></span>' +
+          '<div class="bar-wrap"><div class="bar-fill" style="width:' + pct + '%;background:' + (TYPE_COLORS[k] || '#888') + '"></div></div>' +
+          '</div>';
+      }
+    } else {
+      html += '<p style="color:var(--pico-muted-color)">24h 内无新事件</p>';
+    }
+    html += '</article>';
+
+    // Archive progress
+    var arch = d.archive || {};
+    html += '<article class="card"><h3>Archive 回溯</h3>' +
+      '<div class="grid-2" style="margin-bottom:0.5rem">' +
+      statCard('公告总数', arch.total_raw_announcements || 0, '') +
+      statCard('已下载全文', arch.with_full_text || 0, '') +
+      statCard('待下载', arch.pending_download || 0, '') +
+      statCard('完成率', (arch.completion_pct || 0) + '%', '') +
+      '</div>';
+    if (arch.last_run) {
+      var lr = arch.last_run;
+      var lrTime = new Date(lr.time).toLocaleTimeString('zh-CN', { hour12: false });
+      var lrStats = lr.stats || {};
+      html += '<p style="font-size:0.8rem;color:var(--pico-muted-color)">最近运行: ' + lrTime +
+        ' · ' + (lrStats.succeeded || 0) + '/' + (lrStats.total_processed || 0) + ' 成功' +
+        ' · ' + (lr.duration_ms || '—') + 'ms</p>';
+    } else {
+      html += '<p style="font-size:0.8rem;color:var(--pico-muted-color)">暂无 Archive 运行记录</p>';
+    }
+    html += '</article>';
+
+    // confidence breakdown
+    html += '<article class="card"><h3>Confidence 分布 (24h)</h3>';
+    var ct = d.confidence_breakdown || {};
+    var ckeys = Object.keys(ct);
+    if (ckeys.length) {
+      var totalConf = ckeys.reduce(function(a, k) { return a + ct[k]; }, 0);
+      for (var j = 0; j < ckeys.length; j++) {
+        var ck = ckeys[j], cv = ct[ck];
+        var cpct = totalConf > 0 ? Math.round(cv / totalConf * 100) : 0;
+        html += '<div style="margin-bottom:0.4rem">' +
+          '<span style="font-size:0.82rem">' + (CONF_NAMES[ck] || ck) + ' <strong>' + cv + '</strong> (' + cpct + '%)</span>' +
+          '<div class="bar-wrap"><div class="bar-fill" style="width:' + cpct + '%;background:' + (CONF_COLORS[ck] || '#888') + '"></div></div>' +
+          '</div>';
+      }
+    } else {
+      html += '<p style="color:var(--pico-muted-color)">无数据</p>';
+    }
+    html += '</article>';
+
+    // LLM usage
+    var lu = d.llm_usage || {};
+    html += '<article class="card"><h3>LLM Token 消耗 (GLM-5.1)</h3>' +
+      '<div class="grid-2" style="margin-bottom:0.5rem">' +
+      statCard('调用次数', (lu.total_calls || 0) + ' (' + (lu.total_success || 0) + ' 成功)', '') +
+      statCard('总 Token', (lu.total_tokens || 0).toLocaleString(), '') +
+      statCard('输入 Token', (lu.total_prompt_tokens || 0).toLocaleString(), '') +
+      statCard('输出 Token', (lu.total_completion_tokens || 0).toLocaleString(), '') +
+      statCard('预估费用 (USD)', '$' + (lu.total_cost_usd || 0).toFixed(4), '') +
+      statCard('失败', lu.total_fail || 0, lu.total_fail > 0 ? 'bg-err' : 'bg-ok') +
+      '</div>';
+    if (lu.last_call_at) {
+      var lcTime = new Date(lu.last_call_at * 1000).toLocaleTimeString('zh-CN', { hour12: false });
+      html += '<p style="font-size:0.78rem;color:var(--pico-muted-color)">最近调用: ' + lcTime +
+        ' · 均价 $' + (lu.total_tokens > 0 ? (lu.total_cost_usd / lu.total_tokens * 1000000).toFixed(2) : '0.00') + '/M tokens</p>';
+    }
+    if (lu.last_error) {
+      html += '<p style="font-size:0.78rem;color:var(--pico-form-element-invalid-border-color)">最近错误: ' + lu.last_error + '</p>';
+    }
+    html += '</article>';
+
+    main.innerHTML = html;
+  }).catch(function(err) {
+    if (err.message === 'unauthorized') return;
+    main.innerHTML = '<div class="error-msg">加载失败: ' + err.message + '</div>';
+  });
+}
+
+function statCard(label, value, cls) {
+  return '<article class="card" style="text-align:center">' +
+    '<div class="stat-num ' + (cls || '') + '">' + value + '</div>' +
+    '<div class="stat-label">' + label + '</div></article>';
+}
+
+// init
+if (!getAuth()) { showLogin(); } else { load(); }
+
+/* ====== dark mode ====== */
+(function() {
+  var KEY = 'dp_theme';
+  var html = document.documentElement;
+  var btn = document.getElementById('themeToggle');
+  if (!btn) return;
+  var saved = localStorage.getItem(KEY);
+  if (saved) {
+    html.setAttribute('data-theme', saved);
+    btn.textContent = saved === 'dark' ? '☀️' : '🌙';
+  } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    html.setAttribute('data-theme', 'dark');
+    btn.textContent = '☀️';
+  }
+  btn.addEventListener('click', function() {
+    var cur = html.getAttribute('data-theme');
+    var next = cur === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    btn.textContent = next === 'dark' ? '☀️' : '🌙';
+    localStorage.setItem(KEY, next);
+  });
+})();
+</script>
+</body>
+</html>

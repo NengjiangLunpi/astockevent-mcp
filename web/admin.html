@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AStockEvent · 管理后台</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+<style>
+  :root { --pico-font-size: 93.75%; }
+  body { max-width: 960px; margin: 0 auto; padding: 0 1rem; }
+  header { padding: 1.5rem 0 0.5rem; position: relative; }
+  .theme-toggle { position: absolute; top: 1.5rem; right: 0; background: none; border: 1px solid var(--pico-muted-border-color); border-radius: 8px; padding: 0.3rem 0.5rem; cursor: pointer; font-size: 1.1rem; line-height: 1; }
+  header h1 { font-size: 1.3rem; margin-bottom: 0.2rem; }
+  header nav { display: flex; flex-wrap: wrap; gap: 0.2rem; }
+  header nav a { font-size: 0.8rem; margin-right: 0.6rem; }
+  header nav a.current { font-weight: 700; text-decoration: underline; }
+  header nav a.soon { color: var(--pico-muted-color); cursor: not-allowed; text-decoration: line-through; }
+  header nav .sep { color: var(--pico-muted-color); font-size: 0.8rem; margin: 0 0.2rem; }
+
+  /* Stat cards row */
+  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
+  .stat-card { padding: 1rem; text-align: center; border: 1px solid var(--pico-muted-border-color); border-radius: 8px; }
+  .stat-card .num { font-size: 1.6rem; font-weight: 700; line-height: 1.2; }
+  .stat-card .label { font-size: 0.75rem; color: var(--pico-muted-color); margin-top: 0.2rem; }
+
+  /* Function grid */
+  .func-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.9rem; }
+  .func-card { padding: 1.2rem; border: 1px solid var(--pico-muted-border-color); border-radius: 10px; text-decoration: none; color: inherit; transition: border-color 0.2s, box-shadow 0.2s; display: block; }
+  .func-card:hover { border-color: var(--pico-primary); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .func-card.disabled { opacity: 0.55; pointer-events: none; }
+  .func-card .icon { font-size: 1.5rem; margin-bottom: 0.4rem; }
+  .func-card h3 { font-size: 0.95rem; margin-bottom: 0.3rem; }
+  .func-card p { font-size: 0.8rem; color: var(--pico-muted-color); margin: 0; }
+  .func-card .tag { display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 3px; margin-top: 0.5rem; }
+  .tag-ready { background: #d5f5e3; color: #1e8449; }
+  .tag-soon { background: #fef9e7; color: #927608; }
+
+  .login-box { max-width: 320px; margin: 4rem auto; text-align: center; }
+  .loading { text-align: center; color: var(--pico-muted-color); padding: 2rem; }
+  footer { text-align: center; padding: 2rem 0; font-size: 0.75rem; color: var(--pico-muted-color); }
+</style>
+</head>
+<body>
+<header>
+  <button class="theme-toggle" id="themeToggle" title="切换深色模式" aria-label="切换深色模式">🌙</button>
+  <h1>AStockEvent 管理后台</h1>
+  <nav>
+    <a href="/">看板</a>
+    <a href="/admin" class="current">管理</a>
+    <a href="/status">状态</a>
+    <a href="/report">报告</a>
+    <a href="/review">审核</a>
+    <span class="sep">|</span>
+    <a href="#" class="soon">存档</a>
+    <a href="#" class="soon">存储</a>
+  </nav>
+</header>
+
+<main id="main">
+  <div class="loading">加载中...</div>
+</main>
+
+<footer>AStockEvent Admin · 仅限授权访问</footer>
+
+<div id="loginForm" style="display:none">
+  <div class="login-box">
+    <h3>管理员登录</h3>
+    <form id="authForm">
+      <input type="text" id="username" placeholder="用户名" required>
+      <input type="password" id="password" placeholder="密码" required>
+      <button type="submit">登录</button>
+    </form>
+  </div>
+</div>
+
+<script>
+var AUTH_KEY = 'dp_admin_auth';
+
+function getAuth() {
+  return sessionStorage.getItem(AUTH_KEY);
+}
+
+function setAuth(u, p) {
+  sessionStorage.setItem(AUTH_KEY, 'Basic ' + btoa(u + ':' + p));
+}
+
+function apiFetch(url) {
+  var headers = {};
+  var auth = getAuth();
+  if (auth) headers['Authorization'] = auth;
+  return fetch(url, { headers: headers }).then(function(r) {
+    if (r.status === 401) { sessionStorage.removeItem(AUTH_KEY); showLogin(); throw new Error('unauthorized'); }
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  });
+}
+
+function showLogin() {
+  document.getElementById('main').innerHTML = '';
+  document.getElementById('loginForm').style.display = 'block';
+}
+
+document.getElementById('authForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  var u = document.getElementById('username').value;
+  var p = document.getElementById('password').value;
+  setAuth(u, p);
+  document.getElementById('loginForm').style.display = 'none';
+  load();
+});
+
+function load() {
+  var main = document.getElementById('main');
+  main.innerHTML = '<div class="loading">加载中...</div>';
+
+  // Fetch status + review summary in parallel
+  Promise.allSettled([
+    apiFetch('/api/status'),
+    apiFetch('/api/reviews/summary')
+  ]).then(function(results) {
+    var status = results[0].status === 'fulfilled' ? results[0].value : null;
+    var reviews = results[1].status === 'fulfilled' ? results[1].value : null;
+
+    var eventCount = status ? (status.database ? status.database.event_count : '—') : '—';
+    var rawCount = status && status.archive ? status.archive.total_raw_announcements : '—';
+    var archPct = status && status.archive ? (status.archive.completion_pct || 0) : 0;
+    var schedulerRunning = status && status.scheduler ? status.scheduler.running : false;
+    var pendingReviews = reviews ? (reviews.by_status && reviews.by_status.pending || 0) : '—';
+    var totalReviews = reviews ? (reviews.by_status ? Object.values(reviews.by_status).reduce(function(a,b){return a+b;}, 0) : '—') : '—';
+
+    // === Stat cards ===
+    var html = '<div class="stat-row">' +
+      statCard(eventCount, 'Event 总数') +
+      statCard(pendingReviews, '待审核') +
+      statCard(rawCount, '归档公告') +
+      statCard(archPct + '%', 'Archive 进度') +
+      statCard(schedulerRunning ? '运行中' : '已停止', '调度器', schedulerRunning ? '#27ae60' : '#c0392b') +
+      '</div>';
+
+    // === Pipeline status quick glance ===
+    if (status && status.pipeline) {
+      var pl = status.pipeline;
+      var lastCycles = pl.last_cycles || [];
+      var lastOk = lastCycles.length > 0 ? lastCycles[0].status === 'ok' : null;
+      var lastTime = lastCycles.length > 0 ? new Date(lastCycles[0].time).toLocaleTimeString('zh-CN', {hour12:false}) : '—';
+      html += '<p style="font-size:0.82rem;color:var(--pico-muted-color);margin-bottom:1.2rem">' +
+        '最近管线: <span style="color:' + (lastOk ? '#27ae60' : '#c0392b') + '">' +
+        (lastOk ? '正常' : '异常') + '</span>' +
+        ' · ' + lastTime +
+        ' · 24h 周期: ' + (pl.last_cycles ? pl.last_cycles.length : '—') + ' 次' +
+        '</p>';
+    }
+
+    // === Function grid ===
+    html += '<div class="func-grid">';
+
+    // Status
+    html += funcCard('/status', '📊', '系统状态', '调度器运行状态、数据库连接、管线周期、Archive 回溯进度', 'tag-ready', '已上线');
+
+    // Report
+    html += funcCard('/report', '📈', '数据报告', '24h Event 类型分布、置信度统计、LLM Token 消耗、Archive 完成率', 'tag-ready', '已上线');
+
+    // Review
+    html += funcCard('/review', '🔍', '提取审核', 'Regex vs LLM 冲突裁决、Golden Dataset 积淀、人工标注', 'tag-ready', '已上线');
+
+    // Archive (future)
+    html += funcCardDisabled('📦', '数据存档', '历史公告全量采集：2020-2026 元数据 + 全文下载 + 进度追踪', 'tag-soon', '即将上线');
+
+    // Storage (future)
+    html += funcCardDisabled('💾', '存储管理', 'OSS 用量统计、各 tier 数据分布、月度费用预估、备份状态', 'tag-soon', '即将上线');
+
+    html += '</div>';
+
+    main.innerHTML = html;
+  }).catch(function(err) {
+    if (err.message === 'unauthorized') return;
+    main.innerHTML = '<div class="error-msg" style="text-align:center;padding:3rem;color:#c0392b">' +
+      '加载失败: ' + err.message + '<br><small>请检查服务器是否正常运行</small></div>';
+  });
+}
+
+function statCard(value, label, color) {
+  return '<div class="stat-card">' +
+    '<div class="num" style="' + (color ? 'color:' + color : '') + '">' + value + '</div>' +
+    '<div class="label">' + label + '</div></div>';
+}
+
+function funcCard(href, icon, title, desc, tagClass, tagText) {
+  return '<a href="' + href + '" class="func-card">' +
+    '<div class="icon">' + icon + '</div>' +
+    '<h3>' + title + '</h3>' +
+    '<p>' + desc + '</p>' +
+    '<span class="tag ' + tagClass + '">' + tagText + '</span>' +
+    '</a>';
+}
+
+function funcCardDisabled(icon, title, desc, tagClass, tagText) {
+  return '<div class="func-card disabled">' +
+    '<div class="icon">' + icon + '</div>' +
+    '<h3>' + title + '</h3>' +
+    '<p>' + desc + '</p>' +
+    '<span class="tag ' + tagClass + '">' + tagText + '</span>' +
+    '</div>';
+}
+
+// init
+if (!getAuth()) { showLogin(); } else { load(); }
+
+/* ====== dark mode ====== */
+(function() {
+  var KEY = 'dp_theme';
+  var html = document.documentElement;
+  var btn = document.getElementById('themeToggle');
+  if (!btn) return;
+  var saved = localStorage.getItem(KEY);
+  if (saved) {
+    html.setAttribute('data-theme', saved);
+    btn.textContent = saved === 'dark' ? '☀️' : '🌙';
+  } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    html.setAttribute('data-theme', 'dark');
+    btn.textContent = '☀️';
+  }
+  btn.addEventListener('click', function() {
+    var cur = html.getAttribute('data-theme');
+    var next = cur === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    btn.textContent = next === 'dark' ? '☀️' : '🌙';
+    localStorage.setItem(KEY, next);
+  });
+})();
+</script>
+</body>
+</html>

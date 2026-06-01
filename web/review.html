@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AStockEvent · 提取审核</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+<style>
+  :root { --pico-font-size: 93.75%; }
+  body { max-width: 960px; margin: 0 auto; padding: 0 1rem; }
+  header { padding: 1.5rem 0 0.5rem; position: relative; }
+  .theme-toggle { position: absolute; top: 1.5rem; right: 0; background: none; border: 1px solid var(--pico-muted-border-color); border-radius: 8px; padding: 0.3rem 0.5rem; cursor: pointer; font-size: 1.1rem; line-height: 1; }
+  header h1 { font-size: 1.3rem; margin-bottom: 0.2rem; }
+  header nav a { font-size: 0.8rem; margin-right: 1rem; }
+  footer { text-align: center; padding: 2rem 0; font-size: 0.75rem; color: var(--pico-muted-color); }
+  .login-box { max-width: 320px; margin: 4rem auto; text-align: center; }
+
+  /* Filter bar */
+  .filter-bar { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 1rem; }
+  .filter-bar button { font-size: 0.75rem; padding: 0.2rem 0.6rem; }
+  .filter-bar .active { background: var(--pico-primary); color: #fff; }
+  .summary-bar { display: flex; gap: 1.5rem; font-size: 0.8rem; margin-bottom: 1rem; color: var(--pico-muted-color); }
+  .summary-bar strong { color: var(--pico-color); }
+
+  /* Conflict cards */
+  .conflict-card { margin-bottom: 1rem; padding: 1rem; border: 1px solid var(--pico-muted-border-color); border-radius: 8px; transition: opacity 0.4s; }
+  .conflict-card.resolved { opacity: 0.3; pointer-events: none; }
+  .conflict-header { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; margin-bottom: 0.8rem; }
+  .conflict-header .stock-info { font-weight: bold; margin-right: 0.5rem; }
+  .badge { font-size: 0.7rem; padding: 0.1rem 0.5rem; border-radius: 3px; }
+  .badge-type { background: #d5f5e3; color: #1e8449; }
+  .badge-field { background: #ebf5fb; color: #2e86c1; }
+  .badge-mismatch { background: #fadbd8; color: #922b21; }
+  .badge-regex-only { background: #fef9e7; color: #7d6608; }
+  .badge-llm-only { background: #eaf2f8; color: #1a5276; }
+
+  /* Comparison */
+  .comparison { display: grid; grid-template-columns: 1fr auto 1fr; gap: 0.5rem; align-items: start; margin-bottom: 0.8rem; }
+  .comparison .side { padding: 0.5rem; border-radius: 6px; }
+  .comparison .regex-side { background: #fef9e7; }
+  .comparison .llm-side { background: #eaf2f8; }
+  .comparison .side-label { font-size: 0.7rem; color: var(--pico-muted-color); margin-bottom: 0.2rem; }
+  .comparison .side-value { font-size: 1rem; font-family: monospace; word-break: break-all; }
+  .comparison .side-value.correct { color: #27ae60; }
+  .comparison .side-value.suspect { color: #c0392b; text-decoration: line-through wavy; }
+  .comparison .vs { font-size: 0.8rem; font-weight: bold; color: var(--pico-muted-color); align-self: center; }
+  .comparison .side-evidence { font-size: 0.75rem; color: var(--pico-muted-color); margin-top: 0.3rem; font-style: italic; }
+
+  /* Source text */
+  .source-text-box { background: var(--pico-card-background); border: 1px solid var(--pico-muted-border-color); border-radius: 6px; padding: 0.6rem; font-size: 0.8rem; max-height: 150px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; line-height: 1.5; }
+  .source-text-box mark { background: #f9e79f; padding: 0.1rem 0.2rem; border-radius: 2px; }
+
+  /* Actions */
+  .actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.8rem; align-items: center; }
+  .actions button { font-size: 0.75rem; padding: 0.3rem 0.8rem; }
+  .manual-input { display: flex; gap: 0.3rem; align-items: center; }
+  .manual-input input { width: 180px; font-size: 0.8rem; }
+  .review-note { flex: 1; min-width: 150px; font-size: 0.75rem; }
+
+  /* Batch bar */
+  .batch-bar { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 1rem; font-size: 0.8rem; }
+
+  .loading { text-align: center; color: var(--pico-muted-color); padding: 2rem; }
+
+  @media (max-width: 600px) {
+    .comparison { grid-template-columns: 1fr; }
+    .comparison .vs { display: none; }
+    header h1 { font-size: 1.1rem; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <button class="theme-toggle" id="themeToggle" title="切换深色模式" aria-label="切换深色模式">🌙</button>
+  <h1>AStockEvent</h1>
+  <nav><a href="/">看板</a><a href="/admin">管理</a><a href="/status">状态</a><a href="/report">报告</a><a href="/review">审核</a></nav>
+</header>
+
+<!-- Summary bar -->
+<div class="summary-bar" id="summaryBar">
+  <span>待审核: <strong id="countPending">—</strong></span>
+  <span>已解决: <strong id="countResolved">—</strong></span>
+  <span>总计: <strong id="countTotal">—</strong></span>
+</div>
+
+<!-- Filter bar -->
+<div class="filter-bar">
+  <span style="font-size:0.75rem;color:var(--pico-muted-color);align-self:center">状态:</span>
+  <button data-filter="status" data-value="" class="active outline">全部</button>
+  <button data-filter="status" data-value="pending" class="outline" style="color:#c0392b">待审核</button>
+  <button data-filter="status" data-value="resolved_regex,resolved_llm,resolved_manual" class="outline">已解决</button>
+</div>
+<div class="filter-bar">
+  <span style="font-size:0.75rem;color:var(--pico-muted-color);align-self:center">类型:</span>
+  <button data-filter="event_type" data-value="" class="active outline">全部</button>
+  <button data-filter="event_type" data-value="share_buyback" class="outline">回购</button>
+  <button data-filter="event_type" data-value="share_reduction" class="outline">减持</button>
+  <button data-filter="event_type" data-value="delisting_risk" class="outline">ST/退市</button>
+  <button data-filter="event_type" data-value="regulatory_letter" class="outline">监管函</button>
+  <button data-filter="event_type" data-value="lockup_expiration" class="outline">解禁</button>
+</div>
+<div class="filter-bar">
+  <span style="font-size:0.75rem;color:var(--pico-muted-color);align-self:center">冲突:</span>
+  <button data-filter="conflict_type" data-value="" class="active outline">全部</button>
+  <button data-filter="conflict_type" data-value="value_mismatch" class="outline">值不匹配</button>
+  <button data-filter="conflict_type" data-value="regex_only" class="outline">仅Regex</button>
+  <button data-filter="conflict_type" data-value="llm_only" class="outline">仅LLM</button>
+</div>
+
+<div class="batch-bar">
+  <button id="batchAcceptLLM" class="outline secondary" style="font-size:0.75rem">全部采用 LLM（当前页）</button>
+  <span id="selectionCount"></span>
+</div>
+
+<main id="reviewList">
+  <div class="loading">加载中...</div>
+</main>
+
+<footer>AStockEvent Admin · 护城河数据 — 仅限授权访问</footer>
+
+<div id="loginForm" style="display:none">
+  <div class="login-box">
+    <h3>管理员登录</h3>
+    <form id="authForm">
+      <input type="text" id="username" placeholder="用户名" required>
+      <input type="password" id="password" placeholder="密码" required>
+      <button type="submit">登录</button>
+    </form>
+  </div>
+</div>
+
+<script>
+// ====== Auth (same pattern as status.html) ======
+var AUTH_KEY = 'dp_admin_auth';
+
+function getAuth() {
+  return sessionStorage.getItem(AUTH_KEY);
+}
+
+function setAuth(u, p) {
+  sessionStorage.setItem(AUTH_KEY, 'Basic ' + btoa(u + ':' + p));
+}
+
+function apiFetch(url, opts) {
+  opts = opts || {};
+  var headers = opts.headers || {};
+  var auth = getAuth();
+  if (auth) headers['Authorization'] = auth;
+  if (opts.body) headers['Content-Type'] = 'application/json';
+  return fetch(url, { headers: headers, method: opts.method || 'GET', body: opts.body }).then(function(r) {
+    if (r.status === 401) { sessionStorage.removeItem(AUTH_KEY); showLogin(); throw new Error('unauthorized'); }
+    if (!r.ok) return r.json().then(function(b) { throw new Error(b.detail || 'HTTP ' + r.status); });
+    return r.json();
+  });
+}
+
+function showLogin() {
+  document.getElementById('reviewList').innerHTML = '';
+  document.getElementById('loginForm').style.display = 'block';
+  document.getElementById('summaryBar').style.display = 'none';
+}
+
+document.getElementById('authForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  setAuth(document.getElementById('username').value, document.getElementById('password').value);
+  document.getElementById('loginForm').style.display = 'none';
+  document.getElementById('summaryBar').style.display = '';
+  load();
+});
+
+// ====== Dark mode (same pattern as all pages) ======
+(function() {
+  var KEY = 'dp_theme';
+  var html = document.documentElement;
+  var btn = document.getElementById('themeToggle');
+  if (!btn) return;
+  var saved = localStorage.getItem(KEY);
+  if (saved) { html.setAttribute('data-theme', saved); btn.textContent = saved === 'dark' ? '☀️' : '🌙'; }
+  else if (window.matchMedia('(prefers-color-scheme: dark)').matches) { html.setAttribute('data-theme', 'dark'); btn.textContent = '☀️'; }
+  btn.addEventListener('click', function() {
+    var cur = html.getAttribute('data-theme');
+    var next = cur === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    btn.textContent = next === 'dark' ? '☀️' : '🌙';
+    localStorage.setItem(KEY, next);
+  });
+})();
+
+// ====== State ======
+var filters = { status: '', event_type: '', conflict_type: '' };
+var allReviews = [];
+var REFRESH_MS = 5 * 60 * 1000;
+
+var EVENT_TYPE_NAMES = {
+  share_reduction: '减持', delisting_risk: 'ST/退市', regulatory_letter: '监管函',
+  lockup_expiration: '解禁', share_buyback: '回购'
+};
+
+var CONFLICT_LABELS = {
+  value_mismatch: '值不匹配', regex_only: '仅 Regex', llm_only: '仅 LLM'
+};
+
+function badgeClass(type) {
+  return type === 'value_mismatch' ? 'badge-mismatch' : (type === 'regex_only' ? 'badge-regex-only' : 'badge-llm-only');
+}
+
+// ====== Load ======
+function load() {
+  var params = new URLSearchParams();
+  params.set('limit', '100');
+  if (filters.status) params.set('status', filters.status);
+  if (filters.event_type) params.set('event_type', filters.event_type);
+  if (filters.conflict_type) params.set('conflict_type', filters.conflict_type);
+
+  apiFetch('/api/reviews?' + params).then(function(resp) {
+    allReviews = resp.data || [];
+    render();
+    updateSummary(resp.summary);
+  }).catch(function(e) {
+    if (e.message !== 'unauthorized') {
+      document.getElementById('reviewList').innerHTML = '<article class="loading">加载失败: ' + e.message + '</article>';
+    }
+  });
+}
+
+function updateSummary(s) {
+  if (!s) return;
+  var pending = (s.by_status && s.by_status.pending) || 0;
+  var resolved = ((s.by_status && s.by_status.resolved_regex) || 0) + ((s.by_status && s.by_status.resolved_llm) || 0) + ((s.by_status && s.by_status.resolved_manual) || 0);
+  var total = pending + resolved;
+  document.getElementById('countPending').textContent = pending;
+  document.getElementById('countResolved').textContent = resolved;
+  document.getElementById('countTotal').textContent = total;
+}
+
+// ====== Render ======
+function render() {
+  var list = document.getElementById('reviewList');
+  if (!allReviews.length) {
+    list.innerHTML = '<article class="loading">暂无冲突记录 🎉 — 正则和 LLM 完全一致</article>';
+    return;
+  }
+
+  var html = '';
+  for (var i = 0; i < allReviews.length; i++) {
+    var r = allReviews[i];
+    var isPending = r.status === 'pending';
+    var isMismatch = r.conflict_type === 'value_mismatch';
+
+    html += '<article class="conflict-card' + (isPending ? '' : ' resolved') + '" data-review-id="' + r.id + '">';
+
+    // Header
+    html += '<div class="conflict-header">';
+    html += '<span class="stock-info">' + esc(r.stock_name || r.stock_code || '—') + ' <small>' + esc(r.stock_code) + '</small></span>';
+    html += '<span class="badge badge-type">' + (EVENT_TYPE_NAMES[r.event_type] || r.event_type) + '</span>';
+    html += '<span class="badge badge-field">' + esc(r.field_name) + '</span>';
+    html += '<span class="badge ' + badgeClass(r.conflict_type) + '">' + (CONFLICT_LABELS[r.conflict_type] || r.conflict_type) + '</span>';
+    if (!isPending) {
+      html += '<span class="badge" style="background:#d5f5e3;color:#1e8449">已解决: ' + r.status.replace('resolved_', '') + '</span>';
+    }
+    html += '<span style="font-size:0.7rem;color:var(--pico-muted-color);margin-left:auto">' + timeAgo(r.created_at) + '</span>';
+    html += '</div>';
+
+    // Comparison
+    if (isMismatch) {
+      html += '<div class="comparison">';
+      html += '<div class="side regex-side"><div class="side-label">Regex 提取</div><div class="side-value suspect">' + esc(r.regex_value || '(空)') + '</div></div>';
+      html += '<div class="vs">vs</div>';
+      html += '<div class="side llm-side"><div class="side-label">LLM 提取</div><div class="side-value correct">' + esc(r.llm_value || '(空)') + '</div>';
+      if (r.llm_evidence) html += '<div class="side-evidence">证据: "' + esc(r.llm_evidence) + '"</div>';
+      html += '</div>';
+      html += '</div>';
+    } else if (r.conflict_type === 'regex_only') {
+      html += '<div class="comparison">';
+      html += '<div class="side regex-side"><div class="side-label">Regex 提取</div><div class="side-value">' + esc(r.regex_value || '(空)') + '</div></div>';
+      html += '<div class="vs">vs</div>';
+      html += '<div class="side llm-side"><div class="side-label">LLM 返回</div><div class="side-value" style="color:var(--pico-muted-color)">(null — 未能提取)</div></div>';
+      html += '</div>';
+    } else {
+      html += '<div class="comparison">';
+      html += '<div class="side regex-side"><div class="side-label">Regex 返回</div><div class="side-value" style="color:var(--pico-muted-color)">(null — 未能提取)</div></div>';
+      html += '<div class="vs">vs</div>';
+      html += '<div class="side llm-side"><div class="side-label">LLM 提取</div><div class="side-value correct">' + esc(r.llm_value || '(空)') + '</div>';
+      if (r.llm_evidence) html += '<div class="side-evidence">证据: "' + esc(r.llm_evidence) + '"</div>';
+      html += '</div>';
+      html += '</div>';
+    }
+
+    // Source text
+    if (r.source_text_snippet) {
+      var snippet = esc(r.source_text_snippet);
+      // Highlight evidence text if present
+      if (r.llm_evidence && snippet.indexOf(esc(r.llm_evidence)) !== -1) {
+        snippet = snippet.replace(esc(r.llm_evidence), '<mark>' + esc(r.llm_evidence) + '</mark>');
+      } else if (r.regex_value && snippet.indexOf(esc(r.regex_value)) !== -1) {
+        snippet = snippet.replace(esc(r.regex_value), '<mark>' + esc(r.regex_value) + '</mark>');
+      }
+      html += '<details><summary>查看原文</summary><div class="source-text-box">' + snippet + '</div></details>';
+    }
+
+    // Actions
+    if (isPending) {
+      html += '<div class="actions">';
+      html += '<button class="btn-resolve outline" onclick="resolveCard(\'' + r.id + '\', \'regex\')">采用 Regex</button>';
+      if (r.llm_value) html += '<button class="btn-resolve" onclick="resolveCard(\'' + r.id + '\', \'llm\')">采用 LLM</button>';
+      html += '<button class="btn-resolve outline secondary" onclick="toggleManual(\'' + r.id + '\')">手动输入</button>';
+      html += '<span class="manual-input" id="manual-' + r.id + '" style="display:none">';
+      html += '<input type="text" class="manual-value" id="manualVal-' + r.id + '" placeholder="输入正确值">';
+      html += '<button onclick="resolveCard(\'' + r.id + '\', \'manual\')">确认</button>';
+      html += '</span>';
+      html += '<input type="text" class="review-note" id="note-' + r.id + '" placeholder="备注（可选）">';
+      html += '<button class="outline secondary" style="font-size:0.7rem" onclick="addGolden(\'' + r.id + '\')" disabled title="请先裁决">☆ 添加 Golden</button>';
+      html += '</div>';
+    } else {
+      html += '<div class="actions" style="font-size:0.75rem;color:var(--pico-muted-color)">';
+      html += '已裁决: <strong>' + esc(r.resolved_value || '—') + '</strong>';
+      if (r.reviewer_note) html += ' · ' + esc(r.reviewer_note);
+      if (r.added_to_golden) html += ' · ⭐ Golden';
+      else html += ' · <button class="outline secondary" style="font-size:0.7rem" onclick="addGolden(\'' + r.id + '\')">☆ 添加 Golden</button>';
+      html += '</div>';
+    }
+    html += '</article>';
+  }
+
+  list.innerHTML = html;
+}
+
+// ====== Resolve ======
+function resolveCard(id, resolution) {
+  var body = { resolution: resolution };
+  if (resolution === 'manual') {
+    body.resolved_value = document.getElementById('manualVal-' + id).value;
+    if (!body.resolved_value) { alert('请输入正确值'); return; }
+  }
+  var note = document.getElementById('note-' + id);
+  if (note) body.reviewer_note = note.value;
+
+  apiFetch('/api/reviews/' + id + '/resolve', { method: 'POST', body: JSON.stringify(body) }).then(function() {
+    // Animate card out
+    var card = document.querySelector('[data-review-id="' + id + '"]');
+    if (card) { card.classList.add('resolved'); }
+    // Reload after brief delay
+    setTimeout(load, 600);
+  }).catch(function(e) {
+    alert('裁决失败: ' + e.message);
+  });
+}
+
+function toggleManual(id) {
+  var el = document.getElementById('manual-' + id);
+  if (el) el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+}
+
+function addGolden(id) {
+  apiFetch('/api/reviews/' + id + '/add-golden', { method: 'POST', body: '{}' }).then(function() {
+    load();
+  }).catch(function(e) {
+    alert('添加 Golden 失败: ' + e.message);
+  });
+}
+
+// ====== Filter ======
+document.querySelectorAll('.filter-bar button[data-filter]').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var filter = this.dataset.filter;
+    var value = this.dataset.value;
+    // Toggle active
+    this.parentElement.querySelectorAll('button').forEach(function(b) { b.classList.remove('active'); });
+    this.classList.add('active');
+    // Update filter
+    filters[filter] = value;
+    load();
+  });
+});
+
+// ====== Batch ======
+document.getElementById('batchAcceptLLM').addEventListener('click', function() {
+  var pending = allReviews.filter(function(r) { return r.status === 'pending'; });
+  if (!pending.length) { alert('当前页没有待审核项'); return; }
+  if (!confirm('确定将当前页 ' + pending.length + ' 条待审核冲突全部采用 LLM 值？')) return;
+
+  var promises = pending.map(function(r) {
+    return apiFetch('/api/reviews/' + r.id + '/resolve', { method: 'POST', body: JSON.stringify({ resolution: 'llm' }) });
+  });
+  Promise.all(promises).then(function() { load(); }).catch(function(e) { alert('批量操作失败: ' + e.message); });
+});
+
+// ====== Helpers ======
+function esc(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function timeAgo(iso) {
+  if (!iso) return '';
+  var diff = Date.now() - new Date(iso).getTime();
+  var m = Math.floor(diff / 60000);
+  if (m < 60) return m + '分钟前';
+  var h = Math.floor(m / 60);
+  if (h < 24) return h + '小时前';
+  return Math.floor(h / 24) + '天前';
+}
+
+// ====== Auto-refresh ======
+setInterval(function() { load(); }, REFRESH_MS);
+
+// ====== Init ======
+if (!getAuth()) { showLogin(); } else { load(); }
+</script>
+</body>
+</html>
