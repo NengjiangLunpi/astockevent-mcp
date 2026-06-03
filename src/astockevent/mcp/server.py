@@ -1,4 +1,4 @@
-"""DataPulseX MCP Server — 3 个 Tool.
+"""AStockEvent MCP Server — 3 个 Tool.
 
 MCP (Model Context Protocol) server for AI Agent consumption.
 Free tier: 100 calls/day.

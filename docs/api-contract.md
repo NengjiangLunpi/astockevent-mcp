@@ -153,7 +153,7 @@ GET /v1/events?since=2026-05-30T15:00:00%2B08&event_type=share_reduction,delisti
 
 - **协议**: Model Context Protocol (2024-11-05 spec)
 - **传输**: `stdio`（本地）或 Streamable HTTP（远程）
-- **Server 名称**: `datapulsex`
+- **Server 名称**: `astockevent`
 - **免费层**: 100 次/天（PM 裁定）
 
 ### 2.2 MCP Tool 定义
