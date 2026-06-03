@@ -57,6 +57,13 @@ TOOLS = [
             },
             "required": [],
         },
+        "annotations": {
+            "title": "Check Events — A-share announcement event scanner",
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True,
+        },
     },
     {
         "name": "get_event_timeline",
@@ -79,6 +86,13 @@ TOOLS = [
                 },
             },
             "required": ["event_id"],
+        },
+        "annotations": {
+            "title": "Get Event Timeline — lifecycle tracking for a single event",
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True,
         },
     },
     {
@@ -113,6 +127,13 @@ TOOLS = [
                 },
             },
             "required": [],
+        },
+        "annotations": {
+            "title": "Get Upcoming Events — early warning for expirations and deadlines",
+            "readOnlyHint": True,
+            "destructiveHint": False,
+            "idempotentHint": True,
+            "openWorldHint": True,
         },
     },
 ]
