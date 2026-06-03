@@ -22,30 +22,36 @@ TOOLS = [
     {
         "name": "check_events",
         "description": (
-            "检查指定股票池在指定时间段内的结构化公告事件。"
-            "返回减持计划、ST/退市风险、监管函件、限售股解禁、股份回购等结构化 Event JSON。"
-            "每个 Event 包含 event_id, event_type, stock_code, stock_name, ai_summary, "
-            "confidence_tier, structured_payload 等字段。"
-            "不返回主观评级，只返回量化事实。"
+            "Query structured announcement events for a watchlist of stocks within a time window. "
+            "Returns structured Event JSON for share reductions, ST/delisting risks, regulatory letters, "
+            "lockup expirations, and share buybacks. "
+            "Each event includes: event_id, event_type, stock_code, stock_name, ai_summary, "
+            "confidence_tier (verified|likely|uncertain), structured_payload (quantitative tags), "
+            "and announcement_date. "
+            "Use when: you need to check recent events for specific stocks, scan a watchlist, "
+            "or filter by event type and date range. "
+            "Do NOT use when: you need real-time stock prices, trading signals, or subjective ratings "
+            "(this tool only returns structured facts from public announcements). "
+            "Returns a JSON array of event objects, newest first."
         ),
         "inputSchema": {
             "type": "object",
             "properties": {
                 "stock_codes": {
                     "type": "string",
-                    "description": "6位股票代码列表，逗号分隔。例如 '002272,600519,300750'",
+                    "description": "Comma-separated 6-digit stock codes. Example: '002272,600519,300750'. Empty = all stocks.",
                 },
                 "event_types": {
                     "type": "string",
-                    "description": "事件类型过滤，逗号分隔。可选: share_reduction,delisting_risk,regulatory_letter,lockup_expiration,share_buyback",
+                    "description": "Comma-separated event types to filter. Options: share_reduction, delisting_risk, regulatory_letter, lockup_expiration, share_buyback. Empty = all types.",
                 },
                 "since": {
                     "type": "string",
-                    "description": "起始日期 YYYY-MM-DD，默认 7 天前",
+                    "description": "Start date in YYYY-MM-DD format. Default: 7 days ago.",
                 },
                 "limit": {
                     "type": "integer",
-                    "description": "最大返回数，默认 50，最大 200",
+                    "description": "Max results to return. Default: 50, Max: 200.",
                     "default": 50,
                 },
             },
@@ -55,16 +61,21 @@ TOOLS = [
     {
         "name": "get_event_timeline",
         "description": (
-            "获取单个事件的完整生命周期时间线。"
-            "追踪事件从 plan → in_progress → completed/terminated 的全过程。"
-            "返回事件详情 + timeline 数组（每个条目包含 date, phase, description）+ 关联事件列表。"
+            "Get the complete lifecycle timeline for a single event. "
+            "Tracks the event through its full lifecycle: plan → in_progress → completed/terminated. "
+            "Returns: event details + timeline array (each entry has date, phase, description) + "
+            "related event IDs. "
+            "Use when: you have an event_id and want to see its full history, phase transitions, "
+            "and related events. "
+            "Do NOT use when: you want to search or browse events (use check_events instead). "
+            "Returns a single event object with timeline, or null if event_id not found."
         ),
         "inputSchema": {
             "type": "object",
             "properties": {
                 "event_id": {
                     "type": "string",
-                    "description": "Event UUID，例如 'dp_c8a7f9e1-d2b4-4a3c-8d5e-1f6a9b3c7d4e'",
+                    "description": "Event UUID v4. Example: 'c8a7f9e1-d2b4-4a3c-8d5e-1f6a9b3c7d4e'",
                 },
             },
             "required": ["event_id"],
@@ -73,25 +84,32 @@ TOOLS = [
     {
         "name": "get_upcoming_events",
         "description": (
-            "获取未来N天内即将发生的事件。"
-            "包括：限售股解禁日、减持计划到期日、退市整理期届满日、回购实施截止日、问询函回复截止日。"
-            "每条返回 event_id, event_type, stock_code, due_date, days_remaining, ai_summary。"
+            "Get events due within the next N days (early warning). "
+            "Covers: lockup share expiration dates, share reduction plan deadlines, "
+            "delisting period end dates, buyback implementation deadlines, "
+            "and regulatory letter reply deadlines. "
+            "Each result includes: event_id, event_type, stock_code, stock_name, "
+            "due_date, days_remaining, and ai_summary. "
+            "Use when: you want to know what's coming up — expirations, deadlines, "
+            "regulatory responses due. "
+            "Do NOT use when: you need historical event data (use check_events). "
+            "Returns a JSON array of upcoming events, ordered by due_date ascending."
         ),
         "inputSchema": {
             "type": "object",
             "properties": {
                 "stock_codes": {
                     "type": "string",
-                    "description": "6位股票代码列表，逗号分隔。不填=全市场",
+                    "description": "Comma-separated 6-digit stock codes. Empty = all stocks.",
                 },
                 "days": {
                     "type": "integer",
-                    "description": "未来天数，默认 7，最大 30",
+                    "description": "Number of days to look ahead. Default: 7, Max: 30.",
                     "default": 7,
                 },
                 "event_types": {
                     "type": "string",
-                    "description": "事件类型过滤，逗号分隔",
+                    "description": "Comma-separated event types to filter. Empty = all types.",
                 },
             },
             "required": [],
