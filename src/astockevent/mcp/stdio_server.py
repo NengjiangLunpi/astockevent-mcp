@@ -1,4 +1,4 @@
-"""AStockEvent MCP Server — stdio 传输层.
+"""DataPulseX MCP Server — stdio 传输层.
 
 启动: python -m astockevent.mcp.stdio_server
 协议: Model Context Protocol (2024-11-05), stdio transport
@@ -200,7 +200,7 @@ async def _handle_call_tool(msg: dict) -> dict:
 
 async def main():
     """MCP stdio 主循环."""
-    logger.info("AStockEvent MCP Server v%s starting on stdio", SERVER_VERSION)
+    logger.info("DataPulseX MCP Server v%s starting on stdio", SERVER_VERSION)
 
     for line in sys.stdin:
         line = line.strip()
