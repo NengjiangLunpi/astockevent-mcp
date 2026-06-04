@@ -8,7 +8,7 @@
 - MCP Server（本仓库有完整代码）
 - Event Schema（本仓库有完整定义）
 
-**以下内容仅在私有仓库** `zhoushukai-ui/astockevent`（PRIVATE）**中：**
+**以下内容仅在私有仓库** `NengjiangLunpi/astockevent`（PRIVATE）**中：**
 - Extractors（公告语义提取引擎）
 - Pipeline（数据管线、调度器、采集器）
 - Case Library（判例库、Golden Dataset）

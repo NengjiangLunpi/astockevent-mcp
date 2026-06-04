@@ -1,6 +1,6 @@
 """⚠️ STUB — SQLAlchemy ORM models (Event, EventTimeline).
 
-完整实现仅在私有仓库 zhoushukai-ui/astockevent (PRIVATE) 中。
+完整实现仅在私有仓库 NengjiangLunpi/astockevent (PRIVATE) 中。
 
 本 Stub 提供 MCP Server 所需模型字段的结构参考，
 使用 Pydantic 近似替代 SQLAlchemy declarative base。
@@ -35,7 +35,7 @@ class Event:
         raise NotImplementedError(
             "Database models are not available in the public subset. "
             "Full implementation is in the private repo: "
-            "https://github.com/zhoushukai-ui/astockevent"
+            "https://github.com/NengjiangLunpi/astockevent"
         )
 
 
@@ -55,5 +55,5 @@ class EventTimeline:
         raise NotImplementedError(
             "Database models are not available in the public subset. "
             "Full implementation is in the private repo: "
-            "https://github.com/zhoushukai-ui/astockevent"
+            "https://github.com/NengjiangLunpi/astockevent"
         )

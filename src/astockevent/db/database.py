@@ -1,6 +1,6 @@
 """⚠️ STUB — async_session_factory.
 
-完整实现仅在私有仓库 zhoushukai-ui/astockevent (PRIVATE) 中。
+完整实现仅在私有仓库 NengjiangLunpi/astockevent (PRIVATE) 中。
 
 MCP Server (server.py) 通过 async_session_factory() 获取数据库会话。
 本 Stub 抛出 NotImplementedError，仅供代码结构参考。
@@ -25,9 +25,9 @@ async def async_session_factory() -> AsyncGenerator[Any, None]:
         NotImplementedError: 本仓库为公开子集，数据库层仅在私有仓库中提供。
     """
     # TODO: 安装完整 astockevent 包后将自动获得真实实现
-    # TODO: 或从私有仓库 zhoushukai-ui/astockevent 获取 db 模块覆盖此 Stub
+    # TODO: 或从私有仓库 NengjiangLunpi/astockevent 获取 db 模块覆盖此 Stub
     raise NotImplementedError(
         "Database layer is not available in the public subset. "
         "Full implementation is in the private repo: "
-        "https://github.com/zhoushukai-ui/astockevent"
+        "https://github.com/NengjiangLunpi/astockevent"
     )
