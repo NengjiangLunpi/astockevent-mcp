@@ -176,7 +176,7 @@ MCP Server 是 REST API 的薄代理层——通过 HTTP 连接 `api.astockevent
 
 ## 联系方式
 
-- **邮箱**: [contact@astockevent.com](mailto:contact@astockevent.com)
+- **邮箱**: [astockevent@outlook.com](astockevent@outlook.com)
 - **API 注册**: [astockevent.com](http://8.210.73.193:8000)（ICP 备案中，暂时使用 IP 访问）
 - **GitHub Issues**: [公开 repo](https://github.com/NengjiangLunpi/astockevent-mcp/issues)
 
@@ -355,7 +355,7 @@ The MCP Server is a thin REST API proxy — it connects to `api.astockevent.com`
 
 ## Contact
 
-- **Email**: [contact@astockevent.com](mailto:contact@astockevent.com)
+- **Email**: [astockevent@outlook.com](mailto:astockevent@outlook.com)
 - **API Registration**: [astockevent.com](http://8.210.73.193:8000) (ICP filing in progress; temporary IP access)
 - **GitHub Issues**: [Public Repo](https://github.com/NengjiangLunpi/astockevent-mcp/issues)
 
