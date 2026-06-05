@@ -29,7 +29,7 @@ AStockEvent 将 A 股上市公司公告转化为**结构化语义事件**，让 
 
 ## 功能特性
 
-- **5 种事件类型** — `share_reduction`（股东减持）、`delisting_risk`（ST/退市风险）、`regulatory_letter`（监管函/问询函）、`lockup_expiration`（限售股解禁）、`share_buyback`（股份回购）
+- **12 种事件类型** — Tier 1（`share_reduction`、`delisting_risk`、`regulatory_letter`、`lockup_expiration`、`share_buyback`）、Tier 2（`asset_restructuring`、`trading_halt_resume`、`pledge_risk`、`earnings_forecast`）、Tier 3（`share_increase`、`dividend`、`violation_penalty`）
 - **3 个 MCP 工具** — `check_events`（批量查询）、`get_event_timeline`（生命周期追踪）、`get_upcoming_events`（提前预警）
 - **结构化 Event JSON** — 每条事件包含 `structured_payload`（量化标签）、`confidence_tier`（verified/likely/uncertain 可信度三级）、`ai_summary`（AI 摘要）、完整 `timeline`（生命周期时间线）
 - **免费额度** — 100 次/天，注册后 200 次/天。付费功能开发中，[注册获取 API Key →](http://8.210.73.193:8000)
@@ -90,13 +90,32 @@ pip install astockevent
 
 ## 事件类型
 
+### Tier 1（MVP — 核心事件）
+
 | 事件类型 | 说明 | 典型生命周期 |
 |---|---|---|
 | `share_reduction` | 股东减持计划、进展、完成 | plan → in_progress → completed |
-| `delisting_risk` | ST/退市风险警示 | warning → confirmed/resolved |
-| `regulatory_letter` | 监管函/问询函/关注函 | pending_reply → replied/overdue |
-| `lockup_expiration` | 限售股/定增解禁 | approaching → expired |
+| `delisting_risk` | ST/退市风险警示 | warning → confirmed / remediation |
+| `regulatory_letter` | 监管函/问询函/关注函 | pending_reply → replied / overdue |
+| `lockup_expiration` | 限售股/定增解禁 | approaching → expiring_soon → expired |
 | `share_buyback` | 股份回购计划与实施 | plan → in_progress → completed |
+
+### Tier 2（Phase 2 — 高频高价值）
+
+| 事件类型 | 说明 | 典型生命周期 |
+|---|---|---|
+| `asset_restructuring` | 重大资产重组/并购 | plan → regulatory_review → approved / rejected / completed |
+| `trading_halt_resume` | 停牌/复牌 | halted → extended → resumed |
+| `pledge_risk` | 质押/补充质押/解除质押/违约处置 | new_pledge → active → released / default_disposal |
+| `earnings_forecast` | 业绩预告/快报/修正 | first_forecast → revised_up/down → final_report |
+
+### Tier 3（Phase 2 — 扩展覆盖）
+
+| 事件类型 | 说明 | 典型生命周期 |
+|---|---|---|
+| `share_increase` | 大股东/董监高增持计划 | plan → in_progress → completed / terminated |
+| `dividend` | 现金分红/送股/转增 | plan → approved → completed / cancelled |
+| `violation_penalty` | 立案调查/行政处罚/市场禁入 | filed → investigating → final_penalty / dismissed |
 
 ## 工具参考
 
@@ -113,7 +132,7 @@ pip install astockevent
 | 参数 | 类型 | 说明 |
 |---|---|---|
 | `stock_codes` | string | 逗号分隔的 6 位股票代码。示例: `002272,600519,300750`。留空=全市场。 |
-| `event_types` | string | 逗号分隔的事件类型。可选: `share_reduction,delisting_risk,regulatory_letter,lockup_expiration,share_buyback`。留空=全部。 |
+| `event_types` | string | 逗号分隔的事件类型（12 种可选）。留空=全部。 |
 | `since` | string | 起始日期 `YYYY-MM-DD`。默认: 7 天前。 |
 | `limit` | integer | 最大返回条数。默认: 50，最大: 200。 |
 
@@ -168,9 +187,35 @@ astockevent-mcp/
 
 ## 重要说明
 
-**本仓库是 AStockEvent 的公开子集**，包含 MCP Server + Event Schema + Web 看板 + API 文档。
+**本仓库是 AStockEvent 的公开子集（Public Subset）**，仅包含 MCP Server + Event Schema + Web 看板 + API 文档。
 
-MCP Server 是 REST API 的薄代理层——通过 HTTP 连接 `api.astockevent.com`，不包含数据库或管线逻辑。完整后端（Extractors / Pipeline / Case Library / 部署脚本）在私有仓库中。
+### 公开 vs 私有仓库隔离
+
+| 内容 | 公开 `astockevent-mcp` | 私有 `astockevent` |
+|------|:--:|:--:|
+| MCP Server 源码（`server.py`, `stdio_server.py`） | ✅ | ✅（主副本） |
+| Event Schema（`schemas.py`） | ✅ | ✅（主副本） |
+| Web 看板（HTML/JS） | ✅ | ✅（主副本） |
+| API Contract（`docs/api-contract.md`） | ✅ | ✅（主副本） |
+| Extractor 引擎（`extractors/`） | ❌ | ✅ |
+| 数据管线（`pipeline/`） | ❌ | ✅ |
+| Case Library（`case_library.py`） | ❌ | ✅ |
+| 数据库迁移（`migrations/`） | ❌ | ✅ |
+| 部署脚本（`scripts/deploy.py`） | ❌ | ✅ |
+| 服务器配置/密钥 | ❌ | ✅ |
+| Golden Dataset（`data/golden/`） | ❌ | ✅ |
+
+**同步规则**：
+- 仅 MCP Server、Schema、Web 看板、API 文档四类文件可同步至公开仓库
+- 同步由 PM（Fernando）在**独立 VSCode 窗口**中手动执行，Dev Agent 绝不操作公开仓库
+- 同步前需确认无硬编码 IP/密钥/内部路径泄露
+
+**安全红线**：
+- 公开 repo 不包含任何数据库连接信息、API 密钥、服务器 IP
+- 公开 repo 不包含 Extractor 引擎（核心竞争力）
+- 公开 repo 不包含 Golden Dataset（护城河资产）
+
+MCP Server 是 REST API 的薄代理层——通过 HTTP 连接 `api.astockevent.com`，不包含数据库或管线逻辑。
 
 > 完整后端代码参见私有仓库 [NengjiangLunpi/astockevent](https://github.com/NengjiangLunpi/astockevent)（PRIVATE）。
 
@@ -204,7 +249,7 @@ AStockEvent transforms A-share listed company announcements into **structured se
 
 ## Features
 
-- **5 Event Types** — `share_reduction`, `delisting_risk` (ST/delisting), `regulatory_letter`, `lockup_expiration`, `share_buyback`
+- **12 Event Types** — Tier 1 (`share_reduction`, `delisting_risk`, `regulatory_letter`, `lockup_expiration`, `share_buyback`), Tier 2 (`asset_restructuring`, `trading_halt_resume`, `pledge_risk`, `earnings_forecast`), Tier 3 (`share_increase`, `dividend`, `violation_penalty`)
 - **3 MCP Tools** — `check_events` (batch query), `get_event_timeline` (lifecycle tracking), `get_upcoming_events` (early warning)
 - **Structured Event JSON** — each event includes `structured_payload` (quantitative tags), `confidence_tier` (verified/likely/uncertain), `ai_summary`, and full `timeline`
 - **Free Tier** — 100 calls/day, 200 calls/day after registration. Paid plans coming soon. [Register for API Key →](http://8.210.73.193:8000)
@@ -265,13 +310,32 @@ Once configured, Claude automatically discovers 3 MCP tools:
 
 ## Event Types
 
+### Tier 1 (MVP — Core Events)
+
 | Event Type | Description | Typical Lifecycle |
 |---|---|---|
 | `share_reduction` | Shareholder reduction plans, progress, completion | plan → in_progress → completed |
-| `delisting_risk` | ST/delisting risk warnings | warning → confirmed/resolved |
-| `regulatory_letter` | Regulatory/inquiry/concern letters | pending_reply → replied/overdue |
-| `lockup_expiration` | Lockup share / private placement expiration | approaching → expired |
+| `delisting_risk` | ST/delisting risk warnings | warning → confirmed / remediation |
+| `regulatory_letter` | Regulatory/inquiry/concern letters | pending_reply → replied / overdue |
+| `lockup_expiration` | Lockup share / private placement expiration | approaching → expiring_soon → expired |
 | `share_buyback` | Share buyback plans and implementation | plan → in_progress → completed |
+
+### Tier 2 (Phase 2 — High Frequency, High Value)
+
+| Event Type | Description | Typical Lifecycle |
+|---|---|---|
+| `asset_restructuring` | Major asset restructuring / M&A | plan → regulatory_review → approved / rejected / completed |
+| `trading_halt_resume` | Trading halt / resumption | halted → extended → resumed |
+| `pledge_risk` | Share pledge / supplementary pledge / release / default | new_pledge → active → released / default_disposal |
+| `earnings_forecast` | Earnings forecast / flash report / revision | first_forecast → revised_up/down → final_report |
+
+### Tier 3 (Phase 2 — Extended Coverage)
+
+| Event Type | Description | Typical Lifecycle |
+|---|---|---|
+| `share_increase` | Major shareholder / insider increase plan | plan → in_progress → completed / terminated |
+| `dividend` | Cash dividend / stock dividend / capital reserve transfer | plan → approved → completed / cancelled |
+| `violation_penalty` | Regulatory investigation / administrative penalty / market ban | filed → investigating → final_penalty / dismissed |
 
 ## Tools Reference
 
@@ -288,7 +352,7 @@ Query structured announcement events for a watchlist of stocks within a time win
 | Parameter | Type | Description |
 |---|---|---|
 | `stock_codes` | string | Comma-separated 6-digit stock codes. Example: `002272,600519,300750`. Empty = all stocks. |
-| `event_types` | string | Comma-separated event types. Options: `share_reduction,delisting_risk,regulatory_letter,lockup_expiration,share_buyback`. Empty = all. |
+| `event_types` | string | Comma-separated event types (12 available). Empty = all. |
 | `since` | string | Start date `YYYY-MM-DD`. Default: 7 days ago. |
 | `limit` | integer | Max results. Default: 50, Max: 200. |
 
@@ -347,9 +411,35 @@ astockevent-mcp/
 
 ## Important Note
 
-**This repository is the public subset of AStockEvent**, containing MCP Server + Event Schema + Web Dashboard + API documentation.
+**This repository is the public subset of AStockEvent**, containing only MCP Server + Event Schema + Web Dashboard + API documentation.
 
-The MCP Server is a thin REST API proxy — it connects to `api.astockevent.com` via HTTP, with no database or pipeline logic included. The complete backend (Extractors / Pipeline / Case Library / Deployment scripts) lives in the private repository.
+### Public vs Private Repository Separation
+
+| Component | Public `astockevent-mcp` | Private `astockevent` |
+|------|:--:|:--:|
+| MCP Server source (`server.py`, `stdio_server.py`) | ✅ | ✅ (canonical) |
+| Event Schema (`schemas.py`) | ✅ | ✅ (canonical) |
+| Web Dashboard (HTML/JS) | ✅ | ✅ (canonical) |
+| API Contract (`docs/api-contract.md`) | ✅ | ✅ (canonical) |
+| Extractor Engine (`extractors/`) | ❌ | ✅ |
+| Data Pipeline (`pipeline/`) | ❌ | ✅ |
+| Case Library (`case_library.py`) | ❌ | ✅ |
+| DB Migrations (`migrations/`) | ❌ | ✅ |
+| Deployment Scripts (`scripts/deploy.py`) | ❌ | ✅ |
+| Server Config / Secrets | ❌ | ✅ |
+| Golden Dataset (`data/golden/`) | ❌ | ✅ |
+
+**Sync Rules**:
+- Only MCP Server, Schema, Web Dashboard, and API docs may be synced to the public repo
+- Sync is performed manually by PM (Fernando) in a **separate VSCode window** — the Dev Agent never touches the public repo
+- Pre-sync review ensures no hardcoded IPs, keys, or internal paths leak
+
+**Security Red Lines**:
+- Public repo contains NO database credentials, API keys, or server IPs
+- Public repo contains NO Extractor engine (core competitive advantage)
+- Public repo contains NO Golden Dataset (moat asset)
+
+The MCP Server is a thin REST API proxy — it connects to `api.astockevent.com` via HTTP, with no database or pipeline logic included.
 
 > Complete backend source: [NengjiangLunpi/astockevent](https://github.com/NengjiangLunpi/astockevent) (PRIVATE).
 
