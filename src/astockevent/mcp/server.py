@@ -1,4 +1,4 @@
-"""AStockEvent MCP Server — 8 Tools (REST API Proxy).
+"""AStockEvent MCP Server — 16 Tools (REST API Proxy).
 
 MCP Server for AI Agent consumption.
 Thin proxy layer: MCP stdio → HTTP → AStockEvent REST API → PostgreSQL.
@@ -8,15 +8,23 @@ Config:
   ASTOCKEVENT_API_URL  — REST API base URL (default: https://astockevent.com)
   ASTOCKEVENT_API_KEY  — API key for authenticated tier (optional; anonymous = free tier)
 
-Tools (8 total, Phase 2):
-  1. search_events_by_stock      — query by stock code(s)
-  2. search_events_by_type       — query by event type(s)
+Tools (16 total, Phase 2):
+  1. search_events_by_stock       — query by stock code(s)
+  2. search_events_by_type        — query by event type(s)
   3. search_events_by_shareholder — query by shareholder name
-  4. get_event_detail            — full event detail (was get_event_timeline)
+  4. get_event_detail             — full event detail (was get_event_timeline)
   5. get_event_timeline           — timeline entries for an event
   6. get_upcoming_events          — upcoming deadlines (unchanged)
   7. search_events                — universal escape hatch (DEV-59)
   8. get_trust_report             — trust/verification report (PO-14e)
+  9. search_dividend_events       — dividend events (DEV-87b)
+ 10. search_violation_events      — violation & penalty events (DEV-87b)
+ 11. search_restructuring_events  — asset restructuring events (DEV-87b)
+ 12. search_shareholder_events    — shareholder behavior events (DEV-87b)
+ 13. search_risk_events           — risk events (DEV-87b)
+ 14. search_regulatory_events     — regulatory events (DEV-87b)
+ 15. search_cb_events             — convertible bond events (G-21)
+ 16. search_fund_events           — fund penetration events (F-7)
 """
 
 import json
@@ -320,6 +328,7 @@ async def search_events(
     status: str = "",
     confidence_tier: str = "",
     shareholder_name: str = "",
+    cb_event_type: str = "",
     severity: str = "",
     sentiment: str = "",
     cursor: str = "",
@@ -330,6 +339,8 @@ async def search_events(
     Proxies to GET /v1/events with all supported filters + cursor pagination.
     DEV-87a: Added event_type (backward-compat alias for event_types),
     severity (red/yellow/green), sentiment (positive/negative/neutral) filters.
+    D-28: cb_event_type filter for sub-type (call_redemption/put_resale/
+    conversion_price_down/maturity) — use search_cb_events for cb-specific queries.
     """
     # DEV-87a: merge backward-compat event_type into event_types
     if event_type and not event_types:
@@ -352,6 +363,8 @@ async def search_events(
         params["confidence_tier"] = confidence_tier
     if shareholder_name:
         params["shareholder_name"] = shareholder_name
+    if cb_event_type:
+        params["cb_event_type"] = cb_event_type
     if cursor:
         params["cursor"] = cursor
 
@@ -520,6 +533,32 @@ async def search_regulatory_events(
     )
 
 
+# ── Tool 15: search_cb_events (G-21: 可转债专用入口) ──
+
+
+async def search_cb_events(
+    stock_codes: str = "",
+    cb_event_type: str = "",
+    status: str = "",
+    cursor: str = "",
+    limit: int = 20,
+) -> dict:
+    """Search convertible bond events (可转债事件).
+
+    Covers: call_redemption (强赎), put_resale (回售), conversion_price_down (下修), maturity (到期).
+    Use when: you want convertible bond corporate action signals — forced redemption deadlines,
+    put-back rights, conversion price adjustments, or maturity redemption.
+    """
+    return await search_events(
+        stock_codes=stock_codes,
+        event_types="cb_event",
+        cb_event_type=cb_event_type,
+        status=status,
+        cursor=cursor,
+        limit=limit,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Tool 8: get_trust_report (PO-14e)
 # ---------------------------------------------------------------------------
@@ -553,6 +592,48 @@ async def get_trust_report(event_id: str) -> dict | None:
     if body.get("error"):
         logger.warning("get_trust_report: API error: %s", body["error"])
         return None
+
+    return body.get("data", {})
+
+
+# ── Tool 16: search_fund_events (F-7: 基金穿透事件) ──
+
+
+async def search_fund_events(
+    fund_code: str,
+    event_types: str = "",
+    days: int = 30,
+    min_weight: float = 0.0,
+) -> dict:
+    """Search fund penetration events — cross-reference holdings with stock events.
+
+    Input a fund code → get its underlying stock holdings → return weighted event feed
+    sorted by impact_score = weight_pct × severity_weight.
+
+    Proxies to GET /v1/funds/{fund_code}/events.
+    """
+    params: dict[str, str | int | float] = {"days": min(days, 90)}
+    if event_types:
+        params["event_types"] = event_types
+    if min_weight > 0:
+        params["min_weight"] = min_weight
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.get(
+                _api(f"/v1/funds/{fund_code}/events"),
+                params=params,
+                headers=_headers(),
+            )
+            resp.raise_for_status()
+            body = resp.json()
+    except httpx.HTTPError as exc:
+        logger.error("search_fund_events: API call failed: %s", exc)
+        return {"data": None, "error": str(exc)}
+
+    if body.get("error"):
+        logger.warning("search_fund_events: API error: %s", body["error"])
+        return {"data": None, "error": body["error"]}
 
     return body.get("data", {})
 
@@ -676,6 +757,23 @@ async def dispatch_tool_call(tool_name: str, arguments: dict) -> dict:
                 status=arguments.get("status", ""),
                 cursor=arguments.get("cursor", ""),
                 limit=arguments.get("limit", 20),
+            )
+        # ── Tool 15: search_cb_events (G-21) ──
+        elif tool_name == "search_cb_events":
+            result = await search_cb_events(
+                stock_codes=arguments.get("stock_codes", ""),
+                cb_event_type=arguments.get("cb_event_type", ""),
+                status=arguments.get("status", ""),
+                cursor=arguments.get("cursor", ""),
+                limit=arguments.get("limit", 20),
+            )
+        # ── Tool 16: search_fund_events (F-7) ──
+        elif tool_name == "search_fund_events":
+            result = await search_fund_events(
+                fund_code=arguments.get("fund_code", ""),
+                event_types=arguments.get("event_types", ""),
+                days=arguments.get("days", 30),
+                min_weight=arguments.get("min_weight", 0.0),
             )
         # ── Tool 8: get_trust_report (PO-14e) ──
         elif tool_name == "get_trust_report":

@@ -26,6 +26,7 @@ from astockevent.mcp.server import (
     search_risk_events,
     search_regulatory_events,
     get_trust_report,
+    search_fund_events,
     dispatch_tool_call,
 )
 
@@ -507,6 +508,104 @@ TOOLS = [
         },
         "annotations": {
             "title": "Search Regulatory Events — exchange scrutiny",
+            "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True,
+        },
+    },
+    # ── Tool 15: search_cb_events (G-21: 可转债专用入口) ──
+    {
+        "name": "search_cb_events",
+        "description": (
+            "Search convertible bond events (可转债事件). "
+            "Covers: call_redemption (强赎/提前赎回), put_resale (回售), "
+            "conversion_price_down (下修转股价), maturity (到期兑付). "
+            "Each event includes: cb_name (可转债名称), cb_event_type (子事件类型), "
+            "and type-specific quantitative fields like redemption_price, event_price, "
+            "old_conversion_price/new_conversion_price, event_date, etc. "
+            "Use when: you want convertible bond corporate action signals — "
+            "forced redemption deadlines (强赎), put-back rights (回售), "
+            "conversion price adjustments (转股价修正), or maturity redemption. "
+            "Convertible bond events are a differentiated product — this tool provides "
+            "the dedicated entry point for this event category. "
+            "Returns: {data: [...], cursor: <next_cursor_or_null>, has_more: bool}."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "stock_codes": {
+                    "type": "string",
+                    "description": "Comma-separated 6-digit stock codes. Empty = all stocks. Example: '113013,128091' for stock codes that issued convertible bonds.",
+                },
+                "cb_event_type": {
+                    "type": "string",
+                    "description": "Filter by convertible bond sub-event type. Options: call_redemption, put_resale, conversion_price_down, maturity. Empty = all types.",
+                },
+                "status": {
+                    "type": "string",
+                    "description": "Filter by event status: active, updating, closed, corrected, archived.",
+                },
+                "cursor": {
+                    "type": "string",
+                    "description": "Pagination cursor from previous response.",
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Max results per page. Default: 20, Max: 200.",
+                    "default": 20,
+                },
+            },
+            "required": [],
+        },
+        "annotations": {
+            "title": "Search Convertible Bond Events — corporate actions for convertible bonds",
+            "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True,
+        },
+    },
+    # ── Tool 16: search_fund_events (F-7: 基金穿透事件) ──
+    {
+        "name": "search_fund_events",
+        "description": (
+            "Search fund penetration events — cross-reference a fund's underlying stock holdings "
+            "with AStockEvent structured events. Returns a weighted event feed sorted by "
+            "impact_score = weight_pct × severity_weight. "
+            "Covers all 13 A-share event types: share_reduction, delisting_risk, regulatory_letter, "
+            "lockup_expiration, share_buyback, asset_restructuring, trading_halt_resume, "
+            "pledge_risk, earnings_forecast, share_increase, dividend, violation_penalty, cb_event. "
+            "Use when: you have a fund code and want to know what events happened to its "
+            "underlying holdings — e.g. monitoring FOF portfolio risk, fund due diligence, "
+            "or checking 'did my fund's heavy-weight stocks have any regulatory issues recently?'. "
+            "Each event includes: stock_code, stock_name, weight_pct, event_type, event_summary, "
+            "impact_score, severity_weight, confidence_tier. "
+            "The response includes fund_info, holdings list, events sorted by impact_score DESC, "
+            "a summary with total_events/affected_holdings_count/affected_weight_pct/top_risk, "
+            "and a data_freshness disclaimer noting holdings are from the latest quarterly report. "
+            "Free tier: Top 10 holdings only. Paid REST tier: full holdings + extended lookback."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "fund_code": {
+                    "type": "string",
+                    "description": "6-digit fund code. Example: '000001' for 华夏成长混合.",
+                },
+                "event_types": {
+                    "type": "string",
+                    "description": "Comma-separated event types to filter. Empty = all 13 types.",
+                },
+                "days": {
+                    "type": "integer",
+                    "description": "Number of days to look back for events. Default: 30, Max: 90.",
+                    "default": 30,
+                },
+                "min_weight": {
+                    "type": "number",
+                    "description": "Minimum holding weight_pct to include (e.g. 5.0 = only stocks with ≥5% weight). Default: 0 (all holdings).",
+                    "default": 0.0,
+                },
+            },
+            "required": ["fund_code"],
+        },
+        "annotations": {
+            "title": "Search Fund Events — penetration view of fund holdings × stock events",
             "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True,
         },
     },
