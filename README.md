@@ -197,9 +197,10 @@ astockevent-mcp/
 | Golden Dataset（`data/golden/`） | ❌ | ✅ |
 
 **同步规则**：
-- 仅 MCP Server、Schema、Web 看板、API 文档四类文件可同步至公开仓库
-- 同步由 PM（Fernando）在**独立 VSCode 窗口**中手动执行，Dev Agent 绝不操作公开仓库
-- 同步前需确认无硬编码 IP/密钥/内部路径泄露
+- 仅 MCP Server（`server.py`, `stdio_server.py`, `__init__.py`, `__main__.py`）、Event Schema、Web 看板、API 文档可同步
+- 私有 repo MCP 文件变更时自动触发同步（Dev Agent 执行）
+- `pyproject.toml` 公共版保持精简（仅 3 个依赖），与私有版不同
+- 同步前自动确认无硬编码 IP/密钥/内部路径泄露
 
 **安全红线**：
 - 公开 repo 不包含任何数据库连接信息、API 密钥、服务器 IP
@@ -412,8 +413,9 @@ astockevent-mcp/
 | Golden Dataset (`data/golden/`) | ❌ | ✅ |
 
 **Sync Rules**:
-- Only MCP Server, Schema, Web Dashboard, and API docs may be synced to the public repo
-- Sync is performed manually by PM (Fernando) in a **separate VSCode window** — the Dev Agent never touches the public repo
+- Only MCP Server (`server.py`, `stdio_server.py`, `__init__.py`, `__main__.py`), Event Schema, Web Dashboard, and API docs may be synced to the public repo
+- Sync is automated — Dev Agent executes when private repo MCP files change
+- Public `pyproject.toml` is intentionally slim (3 deps only), different from private
 - Pre-sync review ensures no hardcoded IPs, keys, or internal paths leak
 
 **Security Red Lines**:
