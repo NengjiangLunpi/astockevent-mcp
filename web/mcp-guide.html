@@ -28,7 +28,7 @@
     <a href="/" class="font-bold text-lg">📊 AStockEvent</a>
     <div class="flex items-center gap-4 text-sm">
       <a href="/" class="text-gray-600 dark:text-gray-300 hover:text-blue-600">首页</a>
-      <a href="/register" class="text-blue-600 hover:underline font-medium">免费注册 →</a>
+      <a href="/mcp-guide#install" class="text-blue-600 hover:underline font-medium">快速开始 ↓</a>
     </div>
   </div>
 </header>
@@ -94,19 +94,15 @@
   </div>
 </section>
 
-<!-- ═══════════ 3. API Key（可选） ═══════════ -->
+<!-- ═══════════ 3. 额度说明 ═══════════ -->
 <section id="get-key" class="mb-10">
-  <h2 class="text-2xl font-bold mb-4">3. API Key（可选）</h2>
+  <h2 class="text-2xl font-bold mb-4">3. 额度说明</h2>
 
-  <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-3">
-    <p class="text-sm"><strong>🚧 开发阶段</strong> — 无需注册即可使用。注册功能即将上线。</p>
+  <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-3">
+    <p class="text-sm"><strong>无需注册，开箱即用。</strong> 当前每天可调用 100 次，个人使用完全够用。</p>
   </div>
 
-  <p class="mb-3 leading-relaxed">
-    <strong>不填 API Key</strong> → 匿名 100 次/天（按 IP 计数），MCP 和 REST API 通用。<br>
-    <strong>有 API Key</strong> → 200 次/天。注册开通后您将获得专属 Key。
-  </p>
-  <p class="text-sm text-gray-500">配置时，<code>ASTOCKEVENT_API_KEY</code> 一行可以直接省略——MCP Server 会自动以匿名模式运行。</p>
+  <p class="text-sm text-gray-500">如果需要更高额度，可以添加 <code>ASTOCKEVENT_API_KEY</code> 环境变量（注册功能即将上线，注册后额度 200 次/天）。下方的配置示例已经是即复制即用的最简版本——<strong>不需要填任何 Key</strong>。</p>
 </section>
 
 <!-- ═══════════ 4. Claude Desktop ═══════════ -->
@@ -116,15 +112,12 @@
   <p class="mb-3 leading-relaxed">打开 <code>claude_desktop_config.json</code>（位置见下），添加：</p>
 
   <div class="relative bg-gray-900 text-gray-100 rounded-lg p-4 mb-3">
-    <button onclick="copyCode(this, `{\n  \"mcpServers\": {\n    \"astockevent\": {\n      \"command\": \"python\",\n      \"args\": [\"-m\", \"astockevent.mcp\"],\n      \"env\": {\n        \"ASTOCKEVENT_API_KEY\": \"你的API Key\"\n      }\n    }\n  }\n}`)" class="copy-btn absolute top-2 right-2 text-xs px-2 py-1 rounded bg-gray-700 text-gray-300">复制</button>
+    <button onclick="copyCode(this, `{\n  \"mcpServers\": {\n    \"astockevent\": {\n      \"command\": \"python\",\n      \"args\": [\"-m\", \"astockevent.mcp\"]\n    }\n  }\n}`)" class="copy-btn absolute top-2 right-2 text-xs px-2 py-1 rounded bg-gray-700 text-gray-300">复制</button>
     <pre><code>{
   "mcpServers": {
     "astockevent": {
       "command": "python",
-      "args": ["-m", "astockevent.mcp"],
-      "env": {
-        "ASTOCKEVENT_API_KEY": "你的API Key"
-      }
+      "args": ["-m", "astockevent.mcp"]
     }
   }
 }</code></pre>
@@ -147,13 +140,11 @@
   <p class="mb-3 leading-relaxed">编辑 <code>~/.hermes/config.yaml</code>，在 <code>mcp_servers:</code> 下添加：</p>
 
   <div class="relative bg-gray-900 text-gray-100 rounded-lg p-4 mb-3">
-    <button onclick="copyCode(this, `mcp_servers:\n  astockevent:\n    command: \"python\"\n    args: [\"-m\", \"astockevent.mcp\"]\n    env:\n      ASTOCKEVENT_API_KEY: \"你的API Key\"")" class="copy-btn absolute top-2 right-2 text-xs px-2 py-1 rounded bg-gray-700 text-gray-300">复制</button>
+    <button onclick="copyCode(this, `mcp_servers:\n  astockevent:\n    command: \"python\"\n    args: [\"-m\", \"astockevent.mcp\"]")" class="copy-btn absolute top-2 right-2 text-xs px-2 py-1 rounded bg-gray-700 text-gray-300">复制</button>
     <pre><code>mcp_servers:
   astockevent:
     command: "python"
-    args: ["-m", "astockevent.mcp"]
-    env:
-      ASTOCKEVENT_API_KEY: "你的API Key"</code></pre>
+    args: ["-m", "astockevent.mcp"]</code></pre>
   </div>
 
   <p class="text-sm text-gray-500">重启 Hermes 或执行 <code>/reload-mcp</code> 即可生效。</p>
@@ -166,15 +157,12 @@
   <p class="mb-3 leading-relaxed">Cursor 设置 → MCP → 添加新 Server：</p>
 
   <div class="relative bg-gray-900 text-gray-100 rounded-lg p-4 mb-3">
-    <button onclick="copyCode(this, `{\n  \"mcpServers\": {\n    \"astockevent\": {\n      \"command\": \"python\",\n      \"args\": [\"-m\", \"astockevent.mcp\"],\n      \"env\": {\n        \"ASTOCKEVENT_API_KEY\": \"你的API Key\"\n      }\n    }\n  }\n}`)" class="copy-btn absolute top-2 right-2 text-xs px-2 py-1 rounded bg-gray-700 text-gray-300">复制</button>
+    <button onclick="copyCode(this, `{\n  \"mcpServers\": {\n    \"astockevent\": {\n      \"command\": \"python\",\n      \"args\": [\"-m\", \"astockevent.mcp\"]\n    }\n  }\n}`)" class="copy-btn absolute top-2 right-2 text-xs px-2 py-1 rounded bg-gray-700 text-gray-300">复制</button>
     <pre><code>{
   "mcpServers": {
     "astockevent": {
       "command": "python",
-      "args": ["-m", "astockevent.mcp"],
-      "env": {
-        "ASTOCKEVENT_API_KEY": "你的API Key"
-      }
+      "args": ["-m", "astockevent.mcp"]
     }
   }
 }</code></pre>
@@ -188,16 +176,13 @@
   <p class="mb-3 leading-relaxed">在 VSCode 设置中搜索 <code>mcp</code>，或直接编辑 <code>.vscode/mcp.json</code>：</p>
 
   <div class="relative bg-gray-900 text-gray-100 rounded-lg p-4 mb-3">
-    <button onclick="copyCode(this, `{\n  \"mcp\": {\n    \"servers\": {\n      \"astockevent\": {\n        \"command\": \"python\",\n        \"args\": [\"-m\", \"astockevent.mcp\"],\n        \"env\": {\n          \"ASTOCKEVENT_API_KEY\": \"你的API Key\"\n        }\n      }\n    }\n  }\n}`)" class="copy-btn absolute top-2 right-2 text-xs px-2 py-1 rounded bg-gray-700 text-gray-300">复制</button>
+    <button onclick="copyCode(this, `{\n  \"mcp\": {\n    \"servers\": {\n      \"astockevent\": {\n        \"command\": \"python\",\n        \"args\": [\"-m\", \"astockevent.mcp\"]\n      }\n    }\n  }\n}`)" class="copy-btn absolute top-2 right-2 text-xs px-2 py-1 rounded bg-gray-700 text-gray-300">复制</button>
     <pre><code>{
   "mcp": {
     "servers": {
       "astockevent": {
         "command": "python",
-        "args": ["-m", "astockevent.mcp"],
-        "env": {
-          "ASTOCKEVENT_API_KEY": "你的API Key"
-        }
+        "args": ["-m", "astockevent.mcp"]
       }
     }
   }
@@ -278,12 +263,12 @@
 
   <dl class="space-y-4">
     <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-      <dt class="font-semibold mb-1">Q: 国内网络能直连吗？</dt>
-      <dd class="text-sm text-gray-600 dark:text-gray-400">AStockEvent MCP Server 本地运行，通过 HTTPS 连接 astockevent.com（香港服务器），国内网络直连可用。</dd>
+      <dt class="font-semibold mb-1">Q: 网络需要特殊配置吗？</dt>
+      <dd class="text-sm text-gray-600 dark:text-gray-400">不需要。MCP Server 在本地运行，通过 HTTPS 通信，国内网络直连可用。</dd>
     </div>
     <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-      <dt class="font-semibold mb-1">Q: 数据来源是什么？</dt>
-      <dd class="text-sm text-gray-600 dark:text-gray-400">巨潮资讯网(cninfo)、深交所(szse)、东方财富(eastmoney)、新浪财经(sina) 四源采集，多源交叉验证。</dd>
+      <dt class="font-semibold mb-1">Q: 数据从哪里来？</dt>
+      <dd class="text-sm text-gray-600 dark:text-gray-400">来自巨潮资讯网、深交所、东方财富等 A 股官方信息披露渠道，多源交叉验证确保准确性。</dd>
     </div>
     <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
       <dt class="font-semibold mb-1">Q: 支持哪些 AI Agent？</dt>
@@ -291,11 +276,11 @@
     </div>
     <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
       <dt class="font-semibold mb-1">Q: REST API 和 MCP 有什么区别？</dt>
-      <dd class="text-sm text-gray-600 dark:text-gray-400">REST API 适合程序化调用（Python/JS/Go 直接发 HTTP 请求）。MCP 适合 AI Agent 场景——Agent 自动发现工具、自动调用，你只需要说人话。两者共享同一后端数据和 API Key。</dd>
+      <dd class="text-sm text-gray-600 dark:text-gray-400">REST API 适合程序代码直接调用（Python/JS/Go HTTP 请求）。MCP 适合 AI Agent 场景——Agent 自动发现工具、自动调用，你只需要用自然语言提问。两者使用同一数据源。</dd>
     </div>
     <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-      <dt class="font-semibold mb-1">Q: 不注册能用吗？</dt>
-      <dd class="text-sm text-gray-600 dark:text-gray-400">🚧 开发阶段，无需注册。MCP 和 REST API 匿名 100 次/天。把配置里的 <code>ASTOCKEVENT_API_KEY</code> 一行删掉即可。注册功能即将上线，注册后额度提升至 200 次/天。</dd>
+      <dt class="font-semibold mb-1">Q: 需要注册吗？</dt>
+      <dd class="text-sm text-gray-600 dark:text-gray-400">不需要。当前开箱即用，每日 100 次调用。注册功能上线后，注册用户可获更高额度。</dd>
     </div>
   </dl>
 </section>
