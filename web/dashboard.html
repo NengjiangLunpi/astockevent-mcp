@@ -406,11 +406,11 @@ function getTypeCounts() {
 function getFilteredByTime(period) {
   if (period === 'today') {
     const today = new Date().toISOString().slice(0, 10);
-    return allEvents.filter(e => (e.created_at || '').slice(0, 10) === today);
+    return allEvents.filter(e => (e.announcement_date || e.created_at || '').slice(0, 10) === today);
   }
   if (period === 'week') {
     const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
-    return allEvents.filter(e => (e.created_at || '').slice(0, 10) >= weekAgo);
+    return allEvents.filter(e => (e.announcement_date || e.created_at || '').slice(0, 10) >= weekAgo);
   }
   return allEvents;
 }
@@ -571,7 +571,7 @@ function renderEvents() {
 }
 
 function getRelevantFields(e) {
-  const p = e.structured_payload || {};
+  const p = e.structured_payload || e.quantitative_tags || {};
   const fields = [];
   const add = (label, value) => {
     if (value !== null && value !== undefined && value !== '' && value !== 'N/A') {
@@ -707,6 +707,16 @@ function getRelevantFields(e) {
       }
   }
 
+  // Fallback: if no structured fields matched, show all quantitative_tags key-value pairs
+  if (fields.length === 0) {
+    Object.keys(p).forEach(function(k) {
+      var v = p[k];
+      if (v !== null && v !== undefined && v !== '' && v !== 'N/A') {
+        add(k, typeof v === 'object' ? JSON.stringify(v) : v);
+      }
+    });
+  }
+
   return fields;
 }
 
@@ -799,7 +809,7 @@ function goToCompany(stockCode) {
 function showJson(eventId) {
   const event = allEvents.find(e => e.event_id === eventId);
   if (!event) return;
-  const json = JSON.stringify(event.structured_payload || {}, null, 2);
+  const json = JSON.stringify(event.structured_payload || event.quantitative_tags || {}, null, 2);
   const w = window.open('', '_blank', 'width=600,height=500');
   if (w) {
     w.document.write('<pre style="font-size:12px;padding:1rem;white-space:pre-wrap">' + escHtml(json) + '</pre>');
