@@ -32,7 +32,7 @@ AStockEvent 将 A 股上市公司公告转化为**结构化语义事件**，让 
 - **13+ 种事件类型** — 减持、ST/退市、监管函、限售解禁、回购、重组、停复牌、质押、业绩预告、增持、分红、违规处罚、可转债
 - **16 个 MCP 工具** — 按股票/类型/股东查询、事件详情/时间线、提前预警、分红/违规/重组/股东/风险/监管专用入口、可转债、基金穿透、可信度报告
 - **结构化 Event JSON** — 每条事件包含 `structured_payload`（量化标签）、`confidence_tier`（verified/likely/uncertain 可信度三级）、`ai_summary`（AI 摘要）、`ai_context`（严重度/情绪）、完整 `timeline`（生命周期时间线）
-- **免费额度** — 100 次/天，注册后 200 次/天。付费功能开发中，[注册获取 API Key →](https://astockevent.com/register)
+- **免费额度** — 🚧 开发阶段，无需注册。匿名 100 次/天（MCP + REST 通用），注册功能即将上线 [了解详情 →](https://astockevent.com/register)
 - **MCP stdio 传输** — 兼容 Claude Desktop / VSCode / 任何 MCP 协议兼容的 AI Agent
 - **零本地依赖** — MCP Server 是 REST API 薄代理，无需数据库、无需数据采集
 
@@ -245,7 +245,7 @@ AStockEvent transforms A-share listed company announcements into **structured se
 - **13+ Event Types** — share reduction, ST/delisting risk, regulatory letters, lockup expiration, buybacks, restructuring, trading halts, pledge risk, earnings forecasts, share increase, dividends, violations, convertible bonds
 - **16 MCP Tools** — query by stock/type/shareholder, event detail & timeline, early warning, 6 domain-specialized tools (dividend/violation/restructuring/shareholder/risk/regulatory), convertible bonds, fund penetration, trust reports
 - **Structured Event JSON** — each event includes `structured_payload` (quantitative tags), `confidence_tier` (verified/likely/uncertain), `ai_summary`, `ai_context` (severity/sentiment), and full `timeline`
-- **Free Tier** — 100 calls/day, 200 calls/day after registration. Paid plans coming soon. [Register for API Key →](https://astockevent.com/register)
+- **Free Tier** — 🚧 Dev phase: no registration required. Anonymous 100 calls/day (REST + MCP). Registration coming soon [Learn more →](https://astockevent.com/register)
 - **MCP stdio transport** — compatible with Claude Desktop / VSCode / any MCP-compatible AI agent
 - **Zero Local Dependencies** — MCP Server is a thin REST API proxy. No database, no data collection needed.
 
