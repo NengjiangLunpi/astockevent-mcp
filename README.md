@@ -184,9 +184,10 @@ astockevent-mcp/
 
 | 内容 | 公开 `astockevent-mcp` | 私有 `astockevent` |
 |------|:--:|:--:|
-| MCP Server 源码（`server.py`, `stdio_server.py`） | ✅ | ✅（主副本） |
+| MCP Server 源码（`server.py`, `stdio_server.py`, `__init__.py`, `__main__.py`） | ✅ | ✅（主副本） |
 | Event Schema（`schemas.py`） | ✅ | ✅（主副本） |
 | Web 看板（HTML/JS） | ✅ | ✅（主副本） |
+| pyproject.toml | ✅（精简 3 deps） | ✅（完整） |
 | API Contract（`docs/api-contract.md`） | ✅ | ✅（主副本） |
 | Extractor 引擎（`extractors/`） | ❌ | ✅ |
 | 数据管线（`pipeline/`） | ❌ | ✅ |
@@ -400,9 +401,10 @@ astockevent-mcp/
 
 | Component | Public `astockevent-mcp` | Private `astockevent` |
 |------|:--:|:--:|
-| MCP Server source (`server.py`, `stdio_server.py`) | ✅ | ✅ (canonical) |
+| MCP Server source (`server.py`, `stdio_server.py`, `__init__.py`, `__main__.py`) | ✅ | ✅ (canonical) |
 | Event Schema (`schemas.py`) | ✅ | ✅ (canonical) |
 | Web Dashboard (HTML/JS) | ✅ | ✅ (canonical) |
+| pyproject.toml | ✅ (slim, 3 deps) | ✅ (full) |
 | API Contract (`docs/api-contract.md`) | ✅ | ✅ (canonical) |
 | Extractor Engine (`extractors/`) | ❌ | ✅ |
 | Data Pipeline (`pipeline/`) | ❌ | ✅ |
