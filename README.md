@@ -29,12 +29,12 @@ AStockEvent 将 A 股上市公司公告转化为**结构化语义事件**，让 
 
 ## 功能特性
 
-- **12 种事件类型** — Tier 1（`share_reduction`、`delisting_risk`、`regulatory_letter`、`lockup_expiration`、`share_buyback`）、Tier 2（`asset_restructuring`、`trading_halt_resume`、`pledge_risk`、`earnings_forecast`）、Tier 3（`share_increase`、`dividend`、`violation_penalty`）
-- **3 个 MCP 工具** — `check_events`（批量查询）、`get_event_timeline`（生命周期追踪）、`get_upcoming_events`（提前预警）
-- **结构化 Event JSON** — 每条事件包含 `structured_payload`（量化标签）、`confidence_tier`（verified/likely/uncertain 可信度三级）、`ai_summary`（AI 摘要）、完整 `timeline`（生命周期时间线）
+- **13+ 种事件类型** — 减持、ST/退市、监管函、限售解禁、回购、重组、停复牌、质押、业绩预告、增持、分红、违规处罚、可转债
+- **16 个 MCP 工具** — 按股票/类型/股东查询、事件详情/时间线、提前预警、分红/违规/重组/股东/风险/监管专用入口、可转债、基金穿透、可信度报告
+- **结构化 Event JSON** — 每条事件包含 `structured_payload`（量化标签）、`confidence_tier`（verified/likely/uncertain 可信度三级）、`ai_summary`（AI 摘要）、`ai_context`（严重度/情绪）、完整 `timeline`（生命周期时间线）
 - **免费额度** — 100 次/天，注册后 200 次/天。付费功能开发中，[注册获取 API Key →](http://8.210.73.193:8000)
 - **MCP stdio 传输** — 兼容 Claude Desktop / VSCode / 任何 MCP 协议兼容的 AI Agent
-- **REST API 代理** — MCP Server 通过 HTTP 连接 AStockEvent API，无需本地部署数据库
+- **零本地依赖** — MCP Server 是 REST API 薄代理，无需数据库、无需数据采集
 
 ## 快速开始
 
@@ -64,11 +64,15 @@ pip install astockevent
 
 ### 3. 在 Claude 中使用
 
-配置完成后，Claude 会自动发现 3 个 MCP 工具：
+配置完成后，Claude 会自动发现 16 个 MCP 工具：
 
-- **查询事件**: "帮我查一下川润股份(002272)这周有没有减持公告"
-- **追踪时间线**: "展示事件 c8a7f9e1-d2b4-4a3c-8d5e-1f6a9b3c7d4e 的完整生命周期"
+- **按股票查询**: "帮我查一下川润股份(002272)这周有没有减持公告"
+- **按类型扫描**: "最近全市场有哪些 ST/退市风险预警？"
+- **事件详情**: "展示事件 c8a7f9e1-d2b4-4a3c-8d5e-1f6a9b3c7d4e 的完整数据"
 - **提前预警**: "未来 7 天有哪些股票有限售股解禁？"
+- **可转债**: "最近有哪些可转债触发强赎？"
+- **基金穿透**: "华夏成长混合(000001)的重仓股最近有什么事件？"
+- **可信度**: "这个减持事件的提取可信度如何？"
 
 ### 4. VSCode Copilot 配置
 
@@ -119,52 +123,39 @@ pip install astockevent
 
 ## 工具参考
 
-### `check_events` — 事件查询
+### 核心查询（7 个）
 
-在时间窗口内批量查询自选股的结构化公告事件。
+| 工具 | 说明 | 关键参数 |
+|------|------|------|
+| `search_events_by_stock` | 按股票代码查询事件 | `stock_codes`（必填） |
+| `search_events_by_type` | 按事件类型全市场扫描 | `event_types`（必填） |
+| `search_events_by_shareholder` | 按股东名称追踪 | `shareholder_name`（必填） |
+| `search_events` | **万能入口** — 支持全部筛选器（股票/类型/严重度/情绪/可转债子类型/日期/股东） | 全部可选 |
+| `get_event_detail` | 获取单条事件完整数据（含 structured_payload） | `event_id`（必填） |
+| `get_event_timeline` | 获取单条事件生命周期时间线 | `event_id`（必填） |
+| `get_upcoming_events` | 未来 N 天到期事件提前预警 | `days`（默认 7，最大 30） |
 
-**适用场景**: 检查特定股票近期事件、扫描自选股、按事件类型和日期范围筛选。
+### 专用入口（7 个）— 预筛选的领域工具
 
-**不适用**: 实时股价、交易信号、主观评级（本工具只返回公开公告的结构化事实）。
+| 工具 | 覆盖事件类型 | 用途 |
+|------|------|------|
+| `search_dividend_events` | `dividend` | 分红/送转公告、除权日、派息率 |
+| `search_violation_events` | `violation_penalty` | 违规处罚、立案调查、行政处罚 |
+| `search_restructuring_events` | `asset_restructuring` | 重大资产重组、并购、借壳 |
+| `search_shareholder_events` | `share_reduction, share_increase, share_buyback, pledge_risk` | 股东行为全景（减持/增持/回购/质押） |
+| `search_risk_events` | `delisting_risk, pledge_risk, trading_halt_resume, lockup_expiration` | 风险预警（ST/质押/停复牌/解禁） |
+| `search_regulatory_events` | `regulatory_letter, violation_penalty` | 监管信号（问询函/关注函/处罚） |
+| `search_cb_events` | `cb_event` | 可转债（强赎/回售/下修/到期） |
 
-**返回**: Event 对象 JSON 数组，按时间倒序排列。
+### 穿透 & 验证（2 个）
 
-| 参数 | 类型 | 说明 |
-|---|---|---|
-| `stock_codes` | string | 逗号分隔的 6 位股票代码。示例: `002272,600519,300750`。留空=全市场。 |
-| `event_types` | string | 逗号分隔的事件类型（12 种可选）。留空=全部。 |
-| `since` | string | 起始日期 `YYYY-MM-DD`。默认: 7 天前。 |
-| `limit` | integer | 最大返回条数。默认: 50，最大: 200。 |
+| 工具 | 说明 | 关键参数 |
+|------|------|------|
+| `search_fund_events` | 基金穿透 — 输入基金代码 → 重仓股 × 事件交叉，按 impact_score 排序 | `fund_code`（必填） |
+| `get_trust_report` | 可信度报告 — 多源交叉验证、提取质量指标 | `event_id`（必填） |
 
-### `get_event_timeline` — 事件时间线
-
-获取单个事件的完整生命周期时间线。
-
-**适用场景**: 已有 event_id，想查看完整历史、阶段变更和相关事件。
-
-**不适用**: 搜索或浏览事件（请用 `check_events`）。
-
-**返回**: 单个事件对象（含 timeline 数组），或 null（未找到）。
-
-| 参数 | 类型 | 说明 |
-|---|---|---|
-| `event_id` | string（必填） | 事件 UUID v4。示例: `c8a7f9e1-d2b4-4a3c-8d5e-1f6a9b3c7d4e` |
-
-### `get_upcoming_events` — 即将发生事件
-
-获取未来 N 天内到期的事件（提前预警）。
-
-**适用场景**: 想知道即将发生什么——解禁到期、减持截止日、监管回复截止日。
-
-**不适用**: 历史事件数据（请用 `check_events`）。
-
-**返回**: 即将发生的事件 JSON 数组，按到期日期升序排列。
-
-| 参数 | 类型 | 说明 |
-|---|---|---|
-| `stock_codes` | string | 逗号分隔的 6 位股票代码。留空=全市场。 |
-| `days` | integer | 向前查看天数。默认: 7，最大: 30。 |
-| `event_types` | string | 逗号分隔的事件类型筛选。留空=全部。 |
+> **向后兼容**: `check_events` 仍可用（已弃用，指向 `search_events`）。
+> 完整参数参见 MCP 工具自身的 `inputSchema`（AI Agent 会自动读取）。
 
 ## 项目结构
 
@@ -172,8 +163,8 @@ pip install astockevent
 astockevent-mcp/
 ├── src/astockevent/
 │   ├── mcp/                 # MCP Server（完整源码）
-│   │   ├── server.py        # 3 个工具核心逻辑
-│   │   ├── stdio_server.py  # MCP stdio 传输层
+│   │   ├── server.py        # 16 个工具核心逻辑 + dispatch
+│   │   ├── stdio_server.py  # MCP stdio 传输层 + Tool 注册
 │   │   ├── __init__.py
 │   │   └── __main__.py      # python -m astockevent.mcp 入口
 │   ├── models/
@@ -249,12 +240,12 @@ AStockEvent transforms A-share listed company announcements into **structured se
 
 ## Features
 
-- **12 Event Types** — Tier 1 (`share_reduction`, `delisting_risk`, `regulatory_letter`, `lockup_expiration`, `share_buyback`), Tier 2 (`asset_restructuring`, `trading_halt_resume`, `pledge_risk`, `earnings_forecast`), Tier 3 (`share_increase`, `dividend`, `violation_penalty`)
-- **3 MCP Tools** — `check_events` (batch query), `get_event_timeline` (lifecycle tracking), `get_upcoming_events` (early warning)
-- **Structured Event JSON** — each event includes `structured_payload` (quantitative tags), `confidence_tier` (verified/likely/uncertain), `ai_summary`, and full `timeline`
+- **13+ Event Types** — share reduction, ST/delisting risk, regulatory letters, lockup expiration, buybacks, restructuring, trading halts, pledge risk, earnings forecasts, share increase, dividends, violations, convertible bonds
+- **16 MCP Tools** — query by stock/type/shareholder, event detail & timeline, early warning, 6 domain-specialized tools (dividend/violation/restructuring/shareholder/risk/regulatory), convertible bonds, fund penetration, trust reports
+- **Structured Event JSON** — each event includes `structured_payload` (quantitative tags), `confidence_tier` (verified/likely/uncertain), `ai_summary`, `ai_context` (severity/sentiment), and full `timeline`
 - **Free Tier** — 100 calls/day, 200 calls/day after registration. Paid plans coming soon. [Register for API Key →](http://8.210.73.193:8000)
 - **MCP stdio transport** — compatible with Claude Desktop / VSCode / any MCP-compatible AI agent
-- **REST API Proxy** — MCP Server connects to AStockEvent API via HTTP. No local database needed.
+- **Zero Local Dependencies** — MCP Server is a thin REST API proxy. No database, no data collection needed.
 
 ## Quick Start
 
@@ -284,11 +275,15 @@ Add to your `claude_desktop_config.json`:
 
 ### 3. Usage in Claude
 
-Once configured, Claude automatically discovers 3 MCP tools:
+Once configured, Claude automatically discovers 16 MCP tools:
 
-- **Check events**: "Check if 川润股份 (002272) has any share reduction announcements this week"
-- **Track timeline**: "Show the full lifecycle of event c8a7f9e1-d2b4-4a3c-8d5e-1f6a9b3c7d4e"
+- **By stock**: "Check if 川润股份 (002272) has any share reduction announcements this week"
+- **By type**: "Show me all ST/delisting risk warnings across the market"
+- **Event detail**: "Show the full timeline of event c8a7f9e1-d2b4-4a3c-8d5e-1f6a9b3c7d4e"
 - **Early warning**: "Which stocks have lockup shares expiring in the next 7 days?"
+- **Convertible bonds**: "Any convertible bonds triggering forced redemption recently?"
+- **Fund penetration**: "What events happened to 华夏成长混合 (000001)'s heavy holdings?"
+- **Trust report**: "How reliable is the extraction for this share reduction event?"
 
 ### 4. VSCode Copilot Configuration
 
@@ -339,52 +334,39 @@ Once configured, Claude automatically discovers 3 MCP tools:
 
 ## Tools Reference
 
-### `check_events`
+### Core Query (7)
 
-Query structured announcement events for a watchlist of stocks within a time window.
+| Tool | Description | Key Parameter |
+|------|------|------|
+| `search_events_by_stock` | Query events for specific stock codes | `stock_codes` (required) |
+| `search_events_by_type` | Market-wide scan by event type | `event_types` (required) |
+| `search_events_by_shareholder` | Track events by shareholder name | `shareholder_name` (required) |
+| `search_events` | **Universal escape hatch** — all filters (stock/type/severity/sentiment/CB sub-type/date/shareholder) | All optional |
+| `get_event_detail` | Full event record with structured_payload | `event_id` (required) |
+| `get_event_timeline` | Event lifecycle timeline | `event_id` (required) |
+| `get_upcoming_events` | Upcoming deadlines (next N days) | `days` (default 7, max 30) |
 
-**Use when**: you need to check recent events for specific stocks, scan a watchlist, or filter by event type and date range.
+### Domain-Specialized (7) — Pre-filtered convenience tools
 
-**Do NOT use when**: you need real-time stock prices, trading signals, or subjective ratings (this tool only returns structured facts from public announcements).
+| Tool | Event Types Covered | Use Case |
+|------|------|------|
+| `search_dividend_events` | `dividend` | Dividend/ex-rights/payout announcements |
+| `search_violation_events` | `violation_penalty` | Regulatory investigations, penalties, fines |
+| `search_restructuring_events` | `asset_restructuring` | M&A, asset injections, reverse mergers |
+| `search_shareholder_events` | `share_reduction, share_increase, share_buyback, pledge_risk` | Insider activity panorama |
+| `search_risk_events` | `delisting_risk, pledge_risk, trading_halt_resume, lockup_expiration` | Early warning signals |
+| `search_regulatory_events` | `regulatory_letter, violation_penalty` | Exchange regulatory scrutiny |
+| `search_cb_events` | `cb_event` | Convertible bonds (forced redemption/put-back/conversion price adjustment/maturity) |
 
-**Returns**: JSON array of event objects, newest first.
+### Penetration & Verification (2)
 
-| Parameter | Type | Description |
-|---|---|---|
-| `stock_codes` | string | Comma-separated 6-digit stock codes. Example: `002272,600519,300750`. Empty = all stocks. |
-| `event_types` | string | Comma-separated event types (12 available). Empty = all. |
-| `since` | string | Start date `YYYY-MM-DD`. Default: 7 days ago. |
-| `limit` | integer | Max results. Default: 50, Max: 200. |
+| Tool | Description | Key Parameter |
+|------|------|------|
+| `search_fund_events` | Fund penetration — fund code → holdings × events, sorted by impact_score | `fund_code` (required) |
+| `get_trust_report` | Trust/verification report — cross-validation & extraction quality metrics | `event_id` (required) |
 
-### `get_event_timeline`
-
-Get the complete lifecycle timeline for a single event.
-
-**Use when**: you have an event_id and want to see its full history, phase transitions, and related events.
-
-**Do NOT use when**: you want to search or browse events (use `check_events` instead).
-
-**Returns**: single event object with timeline array, or null if not found.
-
-| Parameter | Type | Description |
-|---|---|---|
-| `event_id` | string (required) | Event UUID v4. Example: `c8a7f9e1-d2b4-4a3c-8d5e-1f6a9b3c7d4e` |
-
-### `get_upcoming_events`
-
-Get events due within the next N days (early warning).
-
-**Use when**: you want to know what's coming up — expirations, deadlines, regulatory responses due.
-
-**Do NOT use when**: you need historical event data (use `check_events`).
-
-**Returns**: JSON array of upcoming events, ordered by due_date ascending.
-
-| Parameter | Type | Description |
-|---|---|---|
-| `stock_codes` | string | Comma-separated 6-digit stock codes. Empty = all stocks. |
-| `days` | integer | Days to look ahead. Default: 7, Max: 30. |
-| `event_types` | string | Comma-separated event types to filter. Empty = all. |
+> **Backward compat**: `check_events` still works (deprecated, points to `search_events`).
+> Full parameter details are in each tool's `inputSchema` (AI agents read them automatically).
 
 ## API Contract
 
@@ -396,7 +378,7 @@ See [docs/api-contract.md](docs/api-contract.md) for the complete REST API + MCP
 astockevent-mcp/
 ├── src/astockevent/
 │   ├── mcp/                 # MCP Server (full source)
-│   │   ├── server.py        # 3 Tool core logic
+│   │   ├── server.py        # 16 Tool core logic + dispatch
 │   │   ├── stdio_server.py  # MCP stdio transport layer
 │   │   ├── __init__.py
 │   │   └── __main__.py      # python -m astockevent.mcp entry point

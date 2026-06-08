@@ -4,24 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "astockevent"
-version = "0.1.0"
-description = "AStockEvent — AI-native A股公告 Event 通知层"
+version = "0.2.0"
+description = "AStockEvent MCP — AI-native A股公告结构化事件 Feed，16 个 MCP 工具"
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi>=0.110.0",
-    "uvicorn[standard]>=0.27.0",
-    "pydantic>=2.5.0",
-    "pydantic-settings>=2.1.0",
-    "sqlalchemy>=2.0.25",
-    "psycopg2-binary>=2.9.9",
-    "alembic>=1.13.0",
-    "apscheduler>=3.10.4",
     "httpx>=0.26.0",
-    "akshare>=1.14.0",
-    "tushare>=1.4.0",
     "mcp>=1.0.0",
     "python-dotenv>=1.0.0",
-    "py-mini-racer>=0.6.0",
 ]
 
 [project.optional-dependencies]
@@ -32,6 +21,9 @@ dev = [
     "mypy>=1.8.0",
     "ruff>=0.1.0",
 ]
+
+[project.scripts]
+astockevent-mcp = "astockevent.mcp:run"
 
 [tool.setuptools.packages.find]
 where = ["src"]
