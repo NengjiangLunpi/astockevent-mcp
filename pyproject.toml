@@ -5,13 +5,34 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "astockevent"
 version = "0.2.0"
-description = "AStockEvent MCP — AI-native A股公告结构化事件 Feed，16 个 MCP 工具"
+description = "AStockEvent MCP Server — Structured A-share announcement event feed for AI agents"
+readme = "README.md"
+license = "MIT"
+authors = [
+    {name = "AStockEvent Team", email = "astockevent@outlook.com"},
+]
+keywords = ["mcp", "a-share", "event-feed", "financial-data", "stock", "announcement", "ai-agent"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 requires-python = ">=3.11"
 dependencies = [
     "httpx>=0.26.0",
     "mcp>=1.0.0",
     "python-dotenv>=1.0.0",
 ]
+
+[project.urls]
+Homepage = "https://astockevent.com"
+Repository = "https://github.com/NengjiangLunpi/astockevent-mcp"
 
 [project.optional-dependencies]
 dev = [
