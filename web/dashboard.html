@@ -1,325 +1,961 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light">
+<html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AStockEvent — A股公告事件流</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
-<style>
-  :root { --pico-font-size: 93.75%; }
-  body { max-width: 960px; margin: 0 auto; padding: 0 1rem; }
-  header { padding: 1.5rem 0 0.5rem; position: relative; }
-  header h1 { margin-bottom: 0.1rem; font-size: 1.4rem; }
-  header p { color: var(--pico-muted-color); font-size: 0.85rem; margin-bottom: 1rem; }
-  .theme-toggle { position: absolute; top: 1.5rem; right: 0; background: none; border: 1px solid var(--pico-muted-border-color); border-radius: 8px; padding: 0.3rem 0.5rem; cursor: pointer; font-size: 1.1rem; line-height: 1; }
-  .filter-bar { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 1.2rem; }
-  .filter-bar button { font-size: 0.82rem; padding: 0.3rem 0.9rem; }
-  .status-bar { display: flex; justify-content: space-between; align-items: center;
-                font-size: 0.78rem; color: var(--pico-muted-color);
-                padding: 0.4rem 0; border-bottom: 1px solid var(--pico-muted-border-color);
-                margin-bottom: 0.8rem; gap: 0.5rem; flex-wrap: wrap; }
-  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 0.3rem; }
-  .dot.on { background: #27ae60; } .dot.off { background: #e74c3c; }
-  .event-card { padding: 0.85rem 0; border-bottom: 1px solid var(--pico-muted-border-color); }
-  .event-card:last-child { border-bottom: none; }
-  .event-header { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.3rem; }
-  .event-stock { font-weight: 700; font-size: 0.92rem; white-space: nowrap; }
-  .event-stock .code { color: var(--pico-muted-color); font-weight: 400; margin-left: 0.25rem; }
-  .badge { display: inline-block; font-size: 0.7rem; padding: 0.1rem 0.5rem;
-           border-radius: 4px; font-weight: 600; white-space: nowrap; }
-  .badge-type { border: 1px solid; }
-  .type-reduction { color: #c0392b; border-color: #c0392b; }
-  .type-delisting { color: #8e1a1a; border-color: #8e1a1a; }
-  .type-regulatory { color: #d35400; border-color: #d35400; }
-  .type-lockup { color: #2471a3; border-color: #2471a3; }
-  .type-buyback { color: #1e8449; border-color: #1e8449; }
-  .conf-verified { background: #d5f5e3; color: #1e8449; }
-  .conf-likely { background: #fef9e7; color: #b7950b; }
-  .conf-uncertain { background: #fadbd8; color: #922b21; }
-  .event-summary { font-size: 0.9rem; line-height: 1.45; margin-bottom: 0.25rem; }
-  .event-meta { font-size: 0.75rem; color: var(--pico-muted-color); display: flex; gap: 1rem; flex-wrap: wrap; }
-  .loading, .empty, .error-msg { text-align: center; padding: 3rem 1rem; color: var(--pico-muted-color); }
-  .error-msg { color: #c0392b; }
-  footer { text-align: center; padding: 2rem 0; font-size: 0.75rem; color: var(--pico-muted-color); }
-  @media (max-width: 600px) {
-    header h1 { font-size: 1.2rem; }
-    .event-meta { gap: 0.5rem; }
-    .filter-bar button { font-size: 0.75rem; padding: 0.2rem 0.6rem; }
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'class',
+    theme: {
+      extend: {
+        fontFamily: { sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'] },
+      }
+    }
   }
+</script>
+<style>
+  /* ── Transition for card expand ── */
+  .expand-enter { animation: slideDown 0.2s ease-out; }
+  @keyframes slideDown {
+    from { opacity: 0; max-height: 0; }
+    to   { opacity: 1; max-height: 600px; }
+  }
+  /* ── Skeleton pulse ── */
+  .skeleton { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.5; }
+  }
+  /* ── Line clamp fallback ── */
+  .line-clamp-2 {
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  /* ── Scrollbar subtle ── */
+  .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+  .sidebar-scroll::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
+  .dark .sidebar-scroll::-webkit-scrollbar-thumb { background: #4b5563; }
 </style>
 </head>
-<body>
-<header>
-  <button class="theme-toggle" id="themeToggle" title="切换深色模式" aria-label="切换深色模式">🌙</button>
-  <h1>AStockEvent</h1>
-  <p>A股公告事件流 — 结构化语义事件，实时监控</p>
+<body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 min-h-screen">
+
+<!-- ═════════════════════════════════════════════════════════════════ TOP BAR ═══ -->
+<header id="topBar" class="sticky top-0 z-30 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+  <div class="flex items-center justify-between h-14 px-4 max-w-[1440px] mx-auto">
+    <!-- Logo -->
+    <a href="/" class="font-bold text-lg text-gray-900 dark:text-white shrink-0 hidden sm:block">
+      📊 AStockEvent
+    </a>
+    <!-- Mobile hamburger -->
+    <button id="mobileMenuBtn" onclick="toggleSidebar()"
+            class="sm:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-xl" title="菜单">
+      ☰
+    </button>
+    <!-- Search -->
+    <div class="flex-1 mx-4 max-w-xl">
+      <input id="searchInput" type="search"
+             placeholder="宁德时代减持 / 问询函 / 立案调查..."
+             class="w-full px-4 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600
+                    bg-gray-50 dark:bg-gray-700 text-sm text-gray-900 dark:text-gray-100
+                    placeholder-gray-400 dark:placeholder-gray-500
+                    focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+                    transition-shadow"
+             data-search-mode="client"
+             oninput="onSearchInput(this.value)">
+    </div>
+    <!-- Right icons -->
+    <div class="flex items-center gap-2 shrink-0">
+      <button onclick="toggleAlerts()" title="告警配置"
+              class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-lg">🔔</button>
+      <button id="themeToggle" onclick="toggleDarkMode()" title="切换暗色模式"
+              class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-lg">🌙</button>
+      <!-- 注册/登录功能开发中，暂隐藏 -->
+    </div>
+  </div>
 </header>
-<div class="filter-bar" id="filterBar">
-  <button data-type="">全部</button>
-  <button class="outline type-reduction" data-type="share_reduction">减持</button>
-  <button class="outline type-delisting" data-type="delisting_risk">ST/退市</button>
-  <button class="outline type-regulatory" data-type="regulatory_letter">监管函件</button>
-  <button class="outline type-lockup" data-type="lockup_expiration">解禁</button>
-  <button class="outline type-buyback" data-type="share_buyback">回购</button>
-</div>
-<div class="status-bar">
-  <span><span class="dot on" id="statusDot"></span><span id="statusText">就绪</span></span>
-  <span id="refreshInfo">—</span>
-</div>
-<main id="eventList">
-  <div class="loading">加载中...</div>
+
+<div class="flex max-w-[1440px] mx-auto">
+
+<!-- ════════════════════════════════════════════════════════════ SIDEBAR ═══════ -->
+<aside id="sidebar" class="w-56 shrink-0 sticky top-14 h-[calc(100vh-3.5rem)] overflow-y-auto sidebar-scroll
+                           bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700
+                           hidden sm:block p-4 space-y-5">
+  <!-- Time filter -->
+  <section>
+    <h3 class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">📅 时间</h3>
+    <div class="space-y-0.5">
+      <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+             id="timeLabel-today">
+        <input type="radio" name="timeFilter" value="today" class="sr-only time-radio"
+               onchange="setTimeFilter('today')">
+        ● 今天
+      </label>
+      <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+             id="timeLabel-week">
+        <input type="radio" name="timeFilter" value="week" class="sr-only time-radio"
+               onchange="setTimeFilter('week')">
+        ○ 本周
+      </label>
+      <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer text-sm bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium"
+             id="timeLabel-all">
+        <input type="radio" name="timeFilter" value="all" class="sr-only time-radio" checked
+               onchange="setTimeFilter('all')">
+        ○ 全部
+      </label>
+    </div>
+  </section>
+
+  <hr class="border-gray-200 dark:border-gray-700">
+
+  <!-- Event type filter -->
+  <section>
+    <h3 class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">事件类型</h3>
+    <div id="typeFilterList" class="space-y-0.5">
+      <!-- Populated by JS -->
+    </div>
+  </section>
+
+  <!-- 我的自选功能开发中，暂隐藏 -->
+  <!--
+  <hr class="border-gray-200 dark:border-gray-700">
+  <section>
+    <h3 class="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">⭐ 我的自选</h3>
+    <div id="myWatchlist" class="text-xs text-gray-400 dark:text-gray-500">
+      <p>登录后可添加自选公司</p>
+      <button onclick="alert('自选功能开发中')"
+              class="mt-1 text-blue-600 hover:underline text-xs">+ 添加公司</button>
+    </div>
+  </section>
+  -->
+
+  <hr class="border-gray-200 dark:border-gray-700">
+
+  <!-- Developer -->
+  <section class="text-xs">
+    <h3 class="font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-2">⚡ 开发者</h3>
+    <div class="space-y-2">
+      <a href="/mcp-guide" class="block text-blue-600 hover:underline font-medium">📋 MCP 接入指南</a>
+      <p class="text-xs text-gray-400">Claude Desktop · Hermes · Cursor · VSCode</p>
+      <a href="/mcp-guide#tools" class="block text-blue-600 hover:underline">📖 工具 & API 文档</a>
+      <p class="text-xs text-gray-400">16 个 MCP 工具 · REST API</p>
+      <a href="https://github.com/NengjiangLunpi/astockevent-mcp" target="_blank" rel="noopener"
+         class="block text-blue-600 hover:underline">⭐ GitHub</a>
+    </div>
+  </section>
+
+  <hr class="border-gray-200 dark:border-gray-700">
+
+  <!-- Contact -->
+  <section class="text-xs">
+    <p class="text-gray-400 dark:text-gray-500">📧 联系邮箱</p>
+    <a href="mailto:astockevent@outlook.com" class="text-blue-600 hover:underline">astockevent@outlook.com</a>
+  </section>
+</aside>
+
+<!-- Mobile sidebar overlay -->
+<div id="sidebarOverlay" class="hidden fixed inset-0 z-40 bg-black/50 sm:hidden" onclick="toggleSidebar()"></div>
+<aside id="sidebarMobile" class="hidden fixed top-0 left-0 z-50 w-64 h-full bg-white dark:bg-gray-800
+                                 overflow-y-auto sidebar-scroll p-4 space-y-5 shadow-xl sm:hidden">
+  <!-- Same content as desktop sidebar, simplified -->
+  <div class="flex justify-between items-center mb-3">
+    <span class="font-bold">📊 筛选</span>
+    <button onclick="toggleSidebar()" class="text-xl">✕</button>
+  </div>
+  <div id="sidebarMobileContent">
+    <!-- Populated by JS -->
+  </div>
+</aside>
+
+<!-- ═══════════════════════════════════════════════════════════ FEED AREA ══════ -->
+<main class="flex-1 min-w-0">
+
+  <!-- Stats bar -->
+  <div id="statsBar" class="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700
+                            bg-white dark:bg-gray-800 flex items-center gap-3 flex-wrap">
+    <span id="connectionDot" class="inline-block w-2 h-2 rounded-full bg-green-500" title="已连接"></span>
+    <span id="statusText">加载中...</span>
+    <span class="text-gray-300 dark:text-gray-600">|</span>
+    <span id="eventCount" class="font-medium text-gray-700 dark:text-gray-300"></span>
+    <span id="topTypeStats" class="hidden sm:flex items-center gap-2 flex-wrap"></span>
+  </div>
+
+  <!-- Feed container -->
+  <div id="feedContainer" class="px-4 py-3 space-y-2">
+    <!-- Skeleton loading -->
+    <div id="skeletonContainer">
+      <div class="skeleton bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3">
+        <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+        <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+        <div class="h-3 bg-gray-100 dark:bg-gray-700 rounded w-1/4"></div>
+      </div>
+      <div class="skeleton bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 mt-2">
+        <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/5"></div>
+        <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
+        <div class="h-3 bg-gray-100 dark:bg-gray-700 rounded w-1/5"></div>
+      </div>
+      <div class="skeleton bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-3 mt-2">
+        <div class="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3"></div>
+        <div class="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+        <div class="h-3 bg-gray-100 dark:bg-gray-700 rounded w-1/4"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty state (hidden by default) -->
+  <div id="emptyState" class="hidden text-center py-16 px-4">
+    <div class="text-4xl mb-3">📭</div>
+    <p class="text-gray-500 dark:text-gray-400 text-sm">
+      今日暂无新事件。管线正在运行中，新事件将在公告发布后 10 分钟内出现。
+    </p>
+  </div>
+
+  <!-- Filter-empty state -->
+  <div id="filterEmptyState" class="hidden text-center py-16 px-4">
+    <div class="text-4xl mb-3">🔍</div>
+    <p class="text-gray-500 dark:text-gray-400 text-sm">
+      当前筛选条件下无匹配事件，试试调整筛选条件？
+    </p>
+  </div>
+
+  <!-- Load more -->
+  <div id="loadMore" class="hidden text-center py-6">
+    <span class="text-sm text-gray-400 dark:text-gray-500">加载更多...</span>
+  </div>
+
 </main>
-<footer>AStockEvent v0.1 · A股公告结构化事件流 · 数据来源：巨潮资讯 · <a href="/admin">管理后台</a></footer>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ FOOTER ══════ -->
+<footer class="text-center py-6 px-4 text-xs text-gray-400 dark:text-gray-600 border-t border-gray-200 dark:border-gray-800">
+  <p>AStockEvent v0.2 · 数据来源: 巨潮资讯网 / 深交所 / 上交所 / 东方财富 / 新浪财经</p>
+</footer>
+
+<!-- Toast container -->
+<div id="toast" class="hidden fixed bottom-4 right-4 z-50 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900
+                        px-4 py-2 rounded-lg shadow-lg text-sm transition-opacity"></div>
+
+<!-- ══════════════════════════════════════════════════════════════ SCRIPTS ═════ -->
 <script>
-var API = '/v1/events';
-var REFRESH_MS = 5 * 60 * 1000;
-var DEBOUNCE_MS = 30 * 1000;
-var TYPE_NAMES = {
-  share_reduction: '减持', delisting_risk: 'ST/退市', regulatory_letter: '监管函',
-  lockup_expiration: '解禁', share_buyback: '回购'
+// ============================================================
+// CONSTANTS — Event type config (aligned with F-26 §6.2)
+// ============================================================
+const TYPE_CONFIG = {
+  share_reduction:      { label: '减持',         color: 'bg-red-100 text-red-700 border-red-300', dot: 'bg-red-500' },
+  delisting_risk:       { label: 'ST/退市',      color: 'bg-red-900/10 text-red-900 border-red-900/30 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800', dot: 'bg-red-900' },
+  regulatory_letter:    { label: '监管函件',      color: 'bg-orange-100 text-orange-700 border-orange-300', dot: 'bg-orange-500' },
+  violation_penalty:    { label: '违规处罚',      color: 'bg-orange-100 text-orange-700 border-orange-300', dot: 'bg-orange-500' },
+  lockup_expiration:    { label: '限售解禁',      color: 'bg-sky-100 text-sky-700 border-sky-300', dot: 'bg-sky-500' },
+  share_buyback:        { label: '股份回购',      color: 'bg-emerald-100 text-emerald-700 border-emerald-300', dot: 'bg-emerald-500' },
+  share_increase:       { label: '增持计划',      color: 'bg-emerald-100 text-emerald-700 border-emerald-300', dot: 'bg-emerald-500' },
+  dividend:             { label: '分红送转',      color: 'bg-green-100 text-green-700 border-green-300', dot: 'bg-green-500' },
+  asset_restructuring:  { label: '重大重组',      color: 'bg-blue-100 text-blue-700 border-blue-300', dot: 'bg-blue-500' },
+  pledge_risk:          { label: '质押风险',      color: 'bg-sky-100 text-sky-700 border-sky-300', dot: 'bg-sky-500' },
+  earnings_forecast:    { label: '业绩预告',      color: 'bg-purple-100 text-purple-700 border-purple-300', dot: 'bg-purple-500' },
+  trading_halt_resume:  { label: '停复牌',        color: 'bg-gray-100 text-gray-600 border-gray-300', dot: 'bg-gray-500' },
+  cb_event:             { label: '可转债',        color: 'bg-blue-100 text-blue-700 border-blue-300', dot: 'bg-blue-500' },
 };
-var TYPE_CSS = {
-  share_reduction: 'type-reduction', delisting_risk: 'type-delisting',
-  regulatory_letter: 'type-regulatory', lockup_expiration: 'type-lockup',
-  share_buyback: 'type-buyback'
-};
-var CONF_NAMES = { verified: '已核实', likely: '未核实', uncertain: '不确定' };
-var CONF_CSS = { verified: 'conf-verified', likely: 'conf-likely', uncertain: 'conf-uncertain' };
-var PHASE_NAMES = {
+
+const CONF_ICONS  = { verified: '🟢', likely: '🟡', uncertain: '🔴' };
+const CONF_LABELS = { verified: '已核实', likely: '未核实', uncertain: '不确定' };
+
+const PHASE_LABELS = {
   plan: '计划中', in_progress: '进行中', completed: '已完成', terminated: '已终止',
-  warning: '预警中', confirmed: '已确认', delisting_period: '退市整理期',
-  remediation: '整改中', approaching: '即将到期', expired: '已到期',
-  expiring_soon: '即将到期', pending_reply: '待回复', replied: '已回复', overdue: '逾期未回'
+  warning: '预警中', confirmed: '已确认', delisting_period: '退市整理期', remediation: '整改中',
+  approaching: '即将到期', expiring_soon: '临近解禁', expired: '已到期',
+  pending_reply: '待回复', replied: '已回复', overdue: '逾期未回',
+  approved: '股东大会通过', implementing: '实施中', cancelled: '已取消',
+  announced: '已公告', in_window: '申报期内', matured: '已到期',
+  proposed: '提议中', effective: '已生效',
 };
-var currentType = '';
-var lastFetchTime = null;
-var cachedEvents = null;
-var autoTimer = null;
 
-function esc(s) {
-  if (!s) return '';
-  var div = document.createElement('div');
-  div.textContent = String(s);
-  return div.innerHTML;
-}
+// Data source display names + hidden sources (no redistribution allowed)
+const SOURCE_LABELS = {
+  cninfo: '巨潮资讯', eastmoney: '东方财富',
+  szse: '深交所', sse: '上交所', sina: '新浪财经',
+};
+const HIDDEN_SOURCES = new Set(['akshare', 'tushare']);
 
-/* ====== anti-spam: debounce via sessionStorage ====== */
-function canFetch() {
-  var key = 'dp_last_fetch_' + (currentType || 'all');
-  var prev = sessionStorage.getItem(key);
-  if (!prev) return true;
-  var elapsed = Date.now() - parseInt(prev, 10);
-  return elapsed >= DEBOUNCE_MS;
-}
+// ============================================================
+// STATE
+// ============================================================
+let allEvents     = [];       // Raw events from API
+let activeTypes   = new Set(); // Active event type filters (empty = show all)
+let activeTime    = 'all';    // 'today' | 'week' | 'all'
+let searchQuery   = '';
+let searchTimer   = null;
+let displayCount  = 50;       // How many events to show (incremental load)
+let isLoading     = false;
+let isLoadingMore = false;   // Guard for infinite-scroll observer
+let fetchError    = null;
+let lastFetchTime = null;
 
-function markFetch() {
-  var key = 'dp_last_fetch_' + (currentType || 'all');
-  sessionStorage.setItem(key, String(Date.now()));
-}
+// SessionStorage keys
+const SS_KEY = 'dashboard_v2_events';
+const SS_KEY_TS = 'dashboard_v2_ts';
+const SS_CAN_FETCH = 'dashboard_v2_can_fetch';
 
-function timeAgo(t) {
-  if (!t) return '';
-  var s = Math.floor((Date.now() - t.getTime()) / 1000);
-  if (s < 60) return s + '秒前';
-  if (s < 3600) return Math.floor(s / 60) + '分钟前';
-  return Math.floor(s / 3600) + '小时前';
-}
+// ============================================================
+// API
+// ============================================================
+async function fetchEvents() {
+  if (isLoading) return;
 
-/* ====== data ====== */
-function fetchEvents(eventType) {
-  var params = new URLSearchParams();
-  params.set('limit', '200');
-  if (eventType) params.set('event_type', eventType);
-  return fetch(API + '?' + params).then(function(resp) {
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    return resp.json();
-  }).then(function(body) {
-    if (body.error) throw new Error(body.error);
-    return body.data || [];
-  });
-}
-
-/* ====== render ====== */
-function renderEvents(events) {
-  var list = document.getElementById('eventList');
-  if (!events.length) {
-    list.innerHTML = '<div class="empty">暂无事件。管线正在运行中，新事件将在公告发布后10分钟内出现。</div>';
-    return;
-  }
-  var html = '';
-  for (var i = 0; i < events.length; i++) {
-    var e = events[i];
-    var typeLabel = TYPE_NAMES[e.event_type] || e.event_type;
-    var typeCss = TYPE_CSS[e.event_type] || '';
-    var confLabel = CONF_NAMES[e.confidence_tier] || e.confidence_tier;
-    var confCss = CONF_CSS[e.confidence_tier] || '';
-    var date = e.announcement_date || '';
-    var time = e.announcement_time || '';
-    var timeMap = { pre_market: '盘前', midday: '盘中', after_market: '盘后', weekend: '周末' };
-    var timeLabel = timeMap[time] || time;
-    html += '<div class="event-card">' +
-      '<div class="event-header">' +
-        '<span class="event-stock">' + esc(e.stock_name || e.stock_code) + '<span class="code">' + esc(e.stock_code) + '</span></span>' +
-        '<span class="badge badge-type ' + typeCss + '">' + typeLabel + '</span>' +
-        '<span class="badge ' + confCss + '">' + confLabel + '</span>' +
-      '</div>' +
-      '<div class="event-summary">' + esc(e.ai_summary || '—') + '</div>' +
-      '<div class="event-meta">' +
-        '<span>' + date + '</span>' +
-        (timeLabel ? '<span>' + timeLabel + '</span>' : '') +
-        '<span>' + esc(PHASE_NAMES[e.phase] || e.phase || '') + '</span>' +
-        (e.source_url ? ' · <a href="' + esc(e.source_url) + '" target="_blank" rel="noopener">查看原文 →</a>' : '') +
-      '</div>' +
-    '</div>';
-  }
-  list.innerHTML = html;
-}
-
-function renderError(err) {
-  document.getElementById('eventList').innerHTML =
-    '<div class="error-msg">加载失败：' + esc(err.message) + '<br><small>数据管线可能正在重启，稍后自动重试...</small></div>';
-}
-
-function updateStatusBar(events) {
-  var dot = document.getElementById('statusDot');
-  var text = document.getElementById('statusText');
-  var info = document.getElementById('refreshInfo');
-
-  if (lastFetchTime) {
-    var ts = lastFetchTime.toLocaleTimeString('zh-CN', { hour12: false });
-    info.textContent = '数据时间: ' + ts + ' 北京时间 (' + timeAgo(lastFetchTime) + ') · 页面每5分钟自动刷新';
-  }
-
-  if (events !== null) {
-    text.textContent = events.length + ' 条事件';
-    dot.className = 'dot on';
-  }
-}
-
-/* ====== load ====== */
-function loadData(force) {
-  force = force || false;
-
-  // debounce check
-  if (!force && !canFetch()) {
-    if (cachedEvents !== null) {
-      renderEvents(cachedEvents);
-      updateStatusBar(cachedEvents);
-    }
-    console.log('Debounced: using cached data');
+  // Anti-shake: 30s between fetches
+  const canFetch = sessionStorage.getItem(SS_CAN_FETCH);
+  if (canFetch && Date.now() - parseInt(canFetch) < 30000) {
+    updateStatus('使用缓存数据', '#f59e0b');
     return;
   }
 
-  document.getElementById('statusDot').className = 'dot on';
-  document.getElementById('statusText').textContent = '更新中...';
+  isLoading = true;
+  updateStatus('加载中...', '#f59e0b');
 
-  fetchEvents(currentType).then(function(events) {
-    renderEvents(events);
-    cachedEvents = events;
-    lastFetchTime = new Date();
-    markFetch();
-    updateStatusBar(events);
-
-    // cache in sessionStorage for F5 resilience
-    try {
-      sessionStorage.setItem('dp_cached_events', JSON.stringify(events));
-      sessionStorage.setItem('dp_cached_time', lastFetchTime.toISOString());
-    } catch(e) { /* quota exceeded, ignore */ }
-  }).catch(function(err) {
-    // on error, try to use cached data
-    if (cachedEvents !== null) {
-      renderEvents(cachedEvents);
-      updateStatusBar(cachedEvents);
-    } else {
-      renderError(err);
-    }
-    document.getElementById('statusDot').className = 'dot off';
-    document.getElementById('statusText').textContent = '连接失败';
-  });
-}
-
-/* ====== F5 resilience: restore from sessionStorage on rapid reload ====== */
-function tryRestoreCache() {
   try {
-    var cached = sessionStorage.getItem('dp_cached_events');
-    var cachedTime = sessionStorage.getItem('dp_cached_time');
-    if (cached && cachedTime) {
-      var events = JSON.parse(cached);
-      var t = new Date(cachedTime);
-      var elapsed = Date.now() - t.getTime();
-      if (elapsed < DEBOUNCE_MS) {
-        // rapid reload: use cached data, skip API call
-        renderEvents(events);
-        cachedEvents = events;
-        lastFetchTime = t;
-        updateStatusBar(events);
-        document.getElementById('statusText').textContent =
-          (events.length || 0) + ' 条事件 (缓存)';
-        return true;
-      }
-      // cache older than debounce window: still show it while fetching
-      if (elapsed < REFRESH_MS) {
-        renderEvents(events);
-        cachedEvents = events;
-        lastFetchTime = t;
-        updateStatusBar(events);
-      }
+    const resp = await fetch('/v1/events?limit=200');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}: ${resp.statusText}`);
+
+    const json = await resp.json();
+    const events = json.data || [];
+
+    // Cache in sessionStorage
+    try {
+      sessionStorage.setItem(SS_KEY, JSON.stringify(events));
+      sessionStorage.setItem(SS_KEY_TS, Date.now().toString());
+      sessionStorage.setItem(SS_CAN_FETCH, Date.now().toString());
+    } catch (e) { /* quota exceeded, ignore */ }
+
+    allEvents = events;
+    fetchError = null;
+    lastFetchTime = new Date();
+
+    updateStatus(`数据更新于 ${fmtTime(lastFetchTime)}`, '#27ae60');
+    refreshUI();
+  } catch (err) {
+    console.error('Fetch error:', err);
+    fetchError = err.message;
+    updateStatus(`⚠ 加载失败: ${err.message}`, '#e74c3c');
+
+    // Fallback to cache
+    const cached = sessionStorage.getItem(SS_KEY);
+    if (cached) {
+      try {
+        allEvents = JSON.parse(cached);
+        lastFetchTime = new Date(parseInt(sessionStorage.getItem(SS_KEY_TS) || '0'));
+        updateStatus(`⚠ 离线模式 — 缓存于 ${fmtTime(lastFetchTime)}`, '#f59e0b');
+        refreshUI();
+      } catch (e) { /* corrupt cache, ignore */ }
     }
-  } catch(e) {}
-  return false;
+  } finally {
+    isLoading = false;
+  }
 }
 
-/* ====== filter ====== */
-document.getElementById('filterBar').addEventListener('click', function(e) {
-  var btn = e.target.closest('button');
-  if (!btn) return;
-  document.getElementById('filterBar').querySelectorAll('button').forEach(function(b) {
-    b.className = (b === btn) ? '' : 'outline';
-    if (b !== btn) { var t = b.dataset.type; if (t && TYPE_CSS[t]) b.classList.add(TYPE_CSS[t]); }
+// ============================================================
+// FILTERING
+// ============================================================
+function getFilteredEvents() {
+  let filtered = allEvents;
+
+  // Time filter
+  if (activeTime === 'today') {
+    const today = new Date().toISOString().slice(0, 10);
+    filtered = filtered.filter(e => {
+      const d = e.created_at || e.announcement_date || '';
+      return d.slice(0, 10) === today;
+    });
+  } else if (activeTime === 'week') {
+    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    filtered = filtered.filter(e => {
+      const d = e.created_at || e.announcement_date || '';
+      return d.slice(0, 10) >= weekAgo;
+    });
+  }
+
+  // Event type filter
+  if (activeTypes.size > 0) {
+    filtered = filtered.filter(e => activeTypes.has(e.event_type));
+  }
+
+  // Search filter
+  if (searchQuery.trim().length >= 2) {
+    const q = searchQuery.trim().toLowerCase();
+    filtered = filtered.filter(e => {
+      const cfg = TYPE_CONFIG[e.event_type];
+      const typeLabel = cfg ? cfg.label : e.event_type;
+      return (e.stock_name || '').toLowerCase().includes(q) ||
+             (e.stock_code || '').toLowerCase().includes(q) ||
+             (e.ai_summary || '').toLowerCase().includes(q) ||
+             typeLabel.toLowerCase().includes(q);
+    });
+  }
+
+  return filtered;
+}
+
+function getTypeCounts() {
+  const counts = {};
+  const base = activeTime === 'today' ? getFilteredByTime('today') :
+               activeTime === 'week'  ? getFilteredByTime('week') : allEvents;
+  for (const e of base) {
+    counts[e.event_type] = (counts[e.event_type] || 0) + 1;
+  }
+  return counts;
+}
+
+function getFilteredByTime(period) {
+  if (period === 'today') {
+    const today = new Date().toISOString().slice(0, 10);
+    return allEvents.filter(e => (e.created_at || '').slice(0, 10) === today);
+  }
+  if (period === 'week') {
+    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+    return allEvents.filter(e => (e.created_at || '').slice(0, 10) >= weekAgo);
+  }
+  return allEvents;
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+function refreshUI() {
+  renderTypeFilters();
+  renderStats();
+  renderEvents();
+}
+
+function renderTypeFilters() {
+  const counts = getTypeCounts();
+  const types = [...new Set(allEvents.map(e => e.event_type))];
+
+  const makeItem = (t, isMobile) => {
+    const cfg = TYPE_CONFIG[t] || { label: t, color: 'bg-gray-100 text-gray-600 border-gray-300', dot: 'bg-gray-500' };
+    const count = counts[t] || 0;
+    const active = activeTypes.has(t);
+    if (isMobile) {
+      return `<button onclick="toggleTypeFilter('${t}', ${!active})"
+        class="text-xs px-2.5 py-1 rounded-full border whitespace-nowrap
+               ${active ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400'}">
+        ${cfg.label} (${count})</button>`;
+    }
+    return `<label class="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer text-sm
+                      ${active ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'
+                               : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400'}">
+      <input type="checkbox" value="${t}" class="sr-only type-cb"
+             ${active ? 'checked' : ''}
+             onchange="toggleTypeFilter('${t}', this.checked)">
+      <span class="w-2 h-2 rounded-full inline-block ${cfg.dot}"></span>
+      ${cfg.label}
+      <span class="text-xs ml-auto text-gray-400">${count}</span>
+    </label>`;
+  };
+
+  document.getElementById('typeFilterList').innerHTML = types.map(t => makeItem(t, false)).join('');
+  document.getElementById('sidebarMobileContent').innerHTML =
+    `<div class="space-y-2">
+      <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">事件类型</p>
+      <div class="flex flex-wrap gap-1.5">${types.map(t => makeItem(t, true)).join('')}</div>
+      <hr class="border-gray-200 dark:border-gray-700 my-2">
+      <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">时间</p>
+      <div class="space-y-0.5">${makeMobileTimeFilters()}</div>
+    </div>`;
+}
+
+function makeMobileTimeFilters() {
+  const periods = [
+    { value: 'today', label: '● 今天', active: activeTime === 'today' },
+    { value: 'week',  label: '○ 本周', active: activeTime === 'week' },
+    { value: 'all',   label: '○ 全部', active: activeTime === 'all' },
+  ];
+  return periods.map(p => `
+    <label class="flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer text-sm
+                    ${p.active ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'
+                               : 'hover:bg-gray-100 dark:hover:bg-gray-700'}">
+      <input type="radio" name="timeFilterMobile" value="${p.value}" class="sr-only"
+             ${p.active ? 'checked' : ''} onchange="setTimeFilter('${p.value}')">
+      ${p.label}
+    </label>`).join('');
+}
+
+function renderStats() {
+  const filtered = getFilteredEvents();
+  const counts = {};
+  for (const e of filtered) { counts[e.event_type] = (counts[e.event_type] || 0) + 1; }
+
+  document.getElementById('eventCount').textContent = `${filtered.length} 条事件`;
+
+  const topTypes = Object.entries(counts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6);
+  document.getElementById('topTypeStats').innerHTML = topTypes.map(([t, n]) => {
+    const cfg = TYPE_CONFIG[t] || { label: t, dot: 'bg-gray-500' };
+    return `<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full ${cfg.dot}"></span>${cfg.label} ${n}</span>`;
+  }).join('');
+}
+
+function renderEvents() {
+  const container = document.getElementById('feedContainer');
+  const filtered = getFilteredEvents();
+  const toShow = filtered.slice(0, displayCount);
+
+  // Hide skeleton (may already be removed by previous render)
+  const skel = document.getElementById('skeletonContainer');
+  if (skel) skel.classList.add('hidden');
+
+  // Toggle empty states
+  const hasEvents = filtered.length > 0;
+  const hasSearchOrFilter = searchQuery.trim().length >= 2 || activeTypes.size > 0 || activeTime !== 'all';
+  document.getElementById('emptyState').classList.toggle('hidden', hasEvents || hasSearchOrFilter);
+  document.getElementById('filterEmptyState').classList.toggle('hidden', hasEvents || !hasSearchOrFilter);
+  document.getElementById('loadMore').classList.toggle('hidden', toShow.length >= filtered.length || filtered.length === 0);
+
+  if (!hasEvents) {
+    container.innerHTML = '';
+    return;
+  }
+
+  container.innerHTML = toShow.map((e, i) => {
+    const cfg = TYPE_CONFIG[e.event_type] || { label: e.event_type, color: 'bg-gray-100 text-gray-600 border-gray-300' };
+    const timeStr = fmtDate(e.created_at);
+    const annStr = fmtAnnDate(e.announcement_date, e.announcement_time);
+    const payloadFields = getRelevantFields(e);
+    const confKey = e.confidence_tier || 'likely';
+    const confIcon = CONF_ICONS[confKey] || '🟡';
+    const confLabel = CONF_LABELS[confKey] || '未核实';
+    const sourceRaw = e.source?.primary?.name || e.source?.name || '';
+    const sourceName = HIDDEN_SOURCES.has(sourceRaw) ? '' : (SOURCE_LABELS[sourceRaw] || sourceRaw);
+
+    return `
+    <article class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg
+                    hover:shadow-sm transition-shadow overflow-hidden">
+      <!-- L1: Summary (always visible) -->
+      <div class="px-4 py-3 cursor-pointer select-none"
+           onclick="toggleExpand('${e.event_id}', this)">
+        <div class="flex items-center gap-2 flex-wrap mb-1.5">
+          <span class="font-semibold text-sm text-gray-900 dark:text-gray-100 hover:text-blue-600 cursor-pointer"
+                onclick="event.stopPropagation(); goToCompany('${escAttr(e.stock_code)}')"
+                title="查看公司事件">${escHtml(e.stock_name || e.stock_code)}</span>
+          ${e.stock_code ? `<span class="text-xs text-gray-400 dark:text-gray-500">${escHtml(e.stock_code)}</span>` : ''}
+          <span class="text-xs px-1.5 py-0.5 rounded border ${cfg.color} font-medium">${cfg.label}</span>
+          <span class="text-xs text-gray-500 dark:text-gray-400" title="${confLabel}">${confIcon} ${confLabel}</span>
+        </div>
+        <p class="text-sm text-gray-700 dark:text-gray-300 line-clamp-2 leading-relaxed">
+          ${escHtml(e.ai_summary || '（暂无摘要）')}
+        </p>
+        <div class="flex items-center gap-3 mt-1.5 text-xs text-gray-400 dark:text-gray-500">
+          ${annStr ? `<span class="text-gray-500 dark:text-gray-400 font-medium">📅 ${escHtml(annStr)}</span>` : ''}
+          <span>${timeStr}</span>
+          ${sourceName ? `<span>${escHtml(sourceName)}</span>` : ''}
+          <span class="text-blue-500 dark:text-blue-400 expand-hint" id="hint-${escAttr(e.event_id)}">展开详情 ▾</span>
+        </div>
+      </div>
+      <!-- L2: Expanded details (hidden by default) -->
+      <div id="detail-${escAttr(e.event_id)}" class="hidden border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/80 rounded-b-lg">
+        <div class="px-4 py-3 space-y-2 expand-enter">
+          ${payloadFields.length > 0 ? payloadFields.map(f => `
+            <div class="flex text-sm">
+              <span class="text-gray-500 dark:text-gray-400 w-28 shrink-0">${escHtml(f.label)}</span>
+              <span class="text-gray-800 dark:text-gray-200 font-medium break-all">${escHtml(String(f.value))}</span>
+            </div>
+          `).join('') : '<p class="text-sm text-gray-400">（暂无结构化数据）</p>'}
+          <div class="pt-2 flex gap-3 text-xs">
+            ${e.source_url ? `<a href="${escAttr(e.source_url)}" target="_blank" rel="noopener"
+                class="text-blue-600 dark:text-blue-400 hover:underline" onclick="event.stopPropagation()">📄 查看原文 ↗</a>` : ''}
+            <button onclick="event.stopPropagation(); showJson('${escAttr(e.event_id)}')"
+                    class="text-gray-500 dark:text-gray-400 hover:underline">📋 完整 JSON</button>
+          </div>
+        </div>
+      </div>
+    </article>`;
+  }).join('');
+}
+
+function getRelevantFields(e) {
+  const p = e.structured_payload || {};
+  const fields = [];
+  const add = (label, value) => {
+    if (value !== null && value !== undefined && value !== '' && value !== 'N/A') {
+      fields.push({ label, value });
+    }
+  };
+
+  switch (e.event_type) {
+    case 'share_reduction':
+      add('减持股东', p.shareholder_name);
+      add('股东类型', p.shareholder_type);
+      add('减持数量', p.reduction_shares ? p.reduction_shares.toLocaleString() + ' 股' : p.change_shares);
+      add('减持比例', p.reduction_ratio ? p.reduction_ratio + '%' : p.change_ratio_pct ? p.change_ratio_pct + '%' : '');
+      add('减持方式', p.reduction_method || p.change_method);
+      add('减持期间', p.reduction_period_start ? `${p.reduction_period_start} ~ ${p.reduction_period_end}` : p.period);
+      add('减持原因', p.reduction_reason);
+      add('减持后持股', p.post_holding ? p.post_holding.toLocaleString() + ' 股' : '');
+      break;
+
+    case 'regulatory_letter':
+    case 'violation_penalty':
+      add('函件类型', p.letter_type || p.penalty_type);
+      add('发出机构', p.issuer);
+      add('问询主题', p.topic);
+      add('回复状态', PHASE_LABELS[p.reply_status] || p.reply_status);
+      add('违规类型', p.violation_type);
+      add('罚金', p.fine_amount_yuan ? '¥' + p.fine_amount_yuan.toLocaleString() : '');
+      add('严重等级', p.severity_level);
+      break;
+
+    case 'lockup_expiration':
+      add('解禁日期', p.unlock_date || p.actual_unlock_date);
+      add('解禁数量', p.unlock_shares ? Number(p.unlock_shares).toLocaleString() + ' 股' : '');
+      add('解禁比例', p.unlock_ratio_pct ? p.unlock_ratio_pct + '%' : (p.actual_unlock_ratio_pct ? p.actual_unlock_ratio_pct + '%' : ''));
+      add('限售原因', p.lockup_reason_label || p.lockup_reason);
+      add('解禁后剩余', p.post_unlock_shares_held ? Number(p.post_unlock_shares_held).toLocaleString() + ' 股' : '');
+      add('股东', p.shareholder_name);
+      break;
+
+    case 'share_buyback':
+      add('回购目的', p.buyback_purpose);
+      add('拟回购数量', p.planned_shares ? Number(p.planned_shares).toLocaleString() + ' 股' : '');
+      add('回购金额上限', p.buyback_amount_max);
+      add('回购金额下限', p.buyback_amount_min);
+      add('回购价格上限', p.buyback_price_max);
+      add('回购期限', p.buyback_period);
+      add('资金来源', p.funding_source);
+      add('回购金额', p.buyback_amount);
+      break;
+
+    case 'delisting_risk':
+      add('风险类型', p.risk_type);
+      add('触发原因', p.trigger_reason);
+      add('当前阶段', p.stage);
+      add('截止日期', p.deadline_date);
+      add('风险等级', p.risk_level);
+      break;
+
+    case 'dividend':
+      add('分红类型', p.dividend_type);
+      add('每10股派息', p.bonus_ratio_rmb ? p.bonus_ratio_rmb + ' 元' : '');
+      add('每10股送股', p.dividend_ratio ? p.dividend_ratio + ' 股' : '');
+      add('每10股转增', p.transfer_ratio ? p.transfer_ratio + ' 股' : '');
+      add('除权除息日', p.a_xr_date || p.ex_right_date);
+      add('股权登记日', p.a_registration_date || p.record_date);
+      add('红利发放日', p.a_dividend_pay_date);
+      break;
+
+    case 'asset_restructuring':
+      add('交易形式', p.transaction_type);
+      add('交易标的', p.target_name);
+      add('交易价格', p.transaction_price);
+      add('评估方法', p.valuation_method);
+      add('评估结果', p.valuation_result);
+      add('增值率', p.premium_rate);
+      add('是否关联交易', p.is_related_party);
+      add('现金对价', p.cash_consideration);
+      add('股份对价', p.share_consideration);
+      add('总对价', p.total_consideration);
+      break;
+
+    case 'earnings_forecast':
+      add('预告类型', p.forecast_type);
+      add('归母净利润', p.net_profit_range);
+      add('同比变化', p.yoy_change_pct ? p.yoy_change_pct + '%' : '');
+      add('业绩变动原因', p.change_reason);
+      add('预告期间', p.forecast_period);
+      break;
+
+    case 'pledge_risk':
+      add('出质人', p.pledgor_name);
+      add('质押股数', p.pledge_shares);
+      add('占持股比例', p.pledged_pct_of_holding ? p.pledged_pct_of_holding + '%' : '');
+      add('占总股本比例', p.pledged_pct_of_total ? p.pledged_pct_of_total + '%' : '');
+      add('质押起始日', p.pledge_start_date);
+      add('质押到期日', p.pledge_end_date);
+      add('质权人', p.pledgee);
+      add('资金用途', p.fund_usage);
+      add('是否控股股东', p.is_controller);
+      break;
+
+    case 'share_increase':
+      add('增持股东', p.shareholder_name);
+      add('增持数量', p.change_shares);
+      add('增持比例', p.change_ratio_pct ? p.change_ratio_pct + '%' : '');
+      add('增持方式', p.change_method);
+      add('增持金额', p.transaction_amount);
+      add('增持后持股', p.post_holding);
+      break;
+
+    case 'trading_halt_resume':
+      add('停复牌类型', p.halt_type);
+      add('停牌日期', p.halt_date);
+      add('复牌日期', p.resume_date);
+      add('停牌原因', p.halt_reason);
+      break;
+
+    case 'cb_event':
+      add('可转债名称', p.cb_name);
+      add('事件子类型', p.cb_event_type);
+      add('赎回价格', p.redemption_price ? p.redemption_price + ' 元/张' : (p.event_price ? p.event_price + ' 元/张' : ''));
+      add('事件日期', p.event_date);
+      add('新旧转股价', p.old_conversion_price && p.new_conversion_price ? `${p.old_conversion_price}→${p.new_conversion_price}` : '');
+      add('回售窗口', p.window_start && p.window_end ? `${p.window_start} ~ ${p.window_end}` : '');
+      break;
+
+    default:
+      // Fallback: show all non-empty, non-nested fields
+      for (const [key, value] of Object.entries(p)) {
+        if (value !== null && value !== undefined && value !== '' && typeof value !== 'object') {
+          add(key, value);
+        }
+      }
+  }
+
+  return fields;
+}
+
+// ============================================================
+// INTERACTIONS
+// ============================================================
+function toggleExpand(eventId, cardEl) {
+  const detail = document.getElementById('detail-' + eventId);
+  const hint   = document.getElementById('hint-' + eventId);
+  if (!detail) return;
+
+  const isHidden = detail.classList.contains('hidden');
+  if (isHidden) {
+    detail.classList.remove('hidden');
+    if (hint) hint.textContent = '收起详情 ▴';
+  } else {
+    detail.classList.add('hidden');
+    if (hint) hint.textContent = '展开详情 ▾';
+  }
+}
+
+function toggleTypeFilter(type, checked) {
+  if (checked) {
+    activeTypes.add(type);
+  } else {
+    activeTypes.delete(type);
+  }
+  displayCount = 50; // Reset pagination
+  renderTypeFilters();
+  renderStats();
+  renderEvents();
+}
+
+function setTimeFilter(period) {
+  activeTime = period;
+  // Update radio button visuals
+  document.querySelectorAll('.time-radio').forEach(r => {
+    const label = r.closest('label');
+    if (!label) return;
+    if (r.value === period) {
+      label.classList.add('bg-blue-50', 'dark:bg-blue-900/30', 'text-blue-700', 'dark:text-blue-300', 'font-medium');
+    } else {
+      label.classList.remove('bg-blue-50', 'dark:bg-blue-900/30', 'text-blue-700', 'dark:text-blue-300', 'font-medium');
+    }
   });
-  if (btn.dataset.type && TYPE_CSS[btn.dataset.type]) btn.classList.add(TYPE_CSS[btn.dataset.type]);
-  currentType = btn.dataset.type || '';
-  loadData(true);
+  displayCount = 50;
+  refreshUI();
+}
+
+function onSearchInput(value) {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    searchQuery = value;
+    displayCount = 50;
+    renderEvents();
+  }, 300);
+}
+
+function loadMore() {
+  if (isLoadingMore) return;
+  isLoadingMore = true;
+  displayCount += 50;
+  renderEvents();
+  isLoadingMore = false;
+}
+
+function toggleSidebar() {
+  const overlay = document.getElementById('sidebarOverlay');
+  const mobile  = document.getElementById('sidebarMobile');
+  const isOpen  = !mobile.classList.contains('hidden');
+  if (isOpen) {
+    overlay.classList.add('hidden');
+    mobile.classList.add('hidden');
+  } else {
+    renderTypeFilters(); // Refresh mobile content
+    overlay.classList.remove('hidden');
+    mobile.classList.remove('hidden');
+  }
+}
+
+function toggleAlerts() {
+  showToast('🔔 告警配置功能开发中 — F-24 待实施');
+}
+
+function goToCompany(stockCode) {
+  // Placeholder for F-23 company event page
+  showToast(`🏢 公司事件页开发中 — F-23 待实施 (${stockCode})`);
+}
+
+function showJson(eventId) {
+  const event = allEvents.find(e => e.event_id === eventId);
+  if (!event) return;
+  const json = JSON.stringify(event.structured_payload || {}, null, 2);
+  const w = window.open('', '_blank', 'width=600,height=500');
+  if (w) {
+    w.document.write('<pre style="font-size:12px;padding:1rem;white-space:pre-wrap">' + escHtml(json) + '</pre>');
+  }
+}
+
+// ============================================================
+// DARK MODE
+// ============================================================
+function initDarkMode() {
+  const stored = localStorage.getItem('dp_theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+  if (stored === 'dark' || (!stored && prefersDark)) {
+    document.documentElement.classList.add('dark');
+    document.getElementById('themeToggle').textContent = '☀️';
+  } else {
+    document.documentElement.classList.remove('dark');
+    document.getElementById('themeToggle').textContent = '🌙';
+  }
+}
+
+function toggleDarkMode() {
+  const isDark = document.documentElement.classList.toggle('dark');
+  localStorage.setItem('dp_theme', isDark ? 'dark' : 'light');
+  document.getElementById('themeToggle').textContent = isDark ? '☀️' : '🌙';
+}
+
+// Listen for system changes
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+  if (!localStorage.getItem('dp_theme')) {
+    document.documentElement.classList.toggle('dark', e.matches);
+    document.getElementById('themeToggle').textContent = e.matches ? '☀️' : '🌙';
+  }
 });
 
-/* ====== init ====== */
-var allBtn = document.querySelector('#filterBar [data-type=""]');
-if (allBtn) allBtn.className = '';
+// ============================================================
+// UTILITIES
+// ============================================================
+function escHtml(s) {
+  if (!s) return '';
+  const d = document.createElement('div');
+  d.textContent = String(s);
+  return d.innerHTML;
+}
 
-// try sessionStorage cache first (F5 resilience)
-var restored = tryRestoreCache();
+function escAttr(s) {
+  if (!s) return '';
+  return String(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 
-// always fetch fresh data (unless debounced)
-loadData(!restored);
+function fmtDate(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  if (isNaN(d.getTime())) return isoStr;
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const datePart = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const timePart = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const diffMs = now - d;
+  if (diffMs < 3600000) return `${Math.floor(diffMs / 60000)} 分钟前`;
+  if (diffMs < 86400000) return `${Math.floor(diffMs / 3600000)} 小时前`;
+  if (diffMs < 604800000) return `${Math.floor(diffMs / 86400000)} 天前`;
+  return `${datePart} ${timePart}`;
+}
 
-// auto-refresh every 5 minutes (always fetches fresh)
-autoTimer = setInterval(function() { loadData(true); }, REFRESH_MS);
+function fmtTime(d) {
+  if (!d) return '—';
+  const pad = n => String(n).padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
 
-/* ====== dark mode ====== */
-(function() {
-  var KEY = 'dp_theme';
-  var html = document.documentElement;
-  var btn = document.getElementById('themeToggle');
-  if (!btn) return;
+function fmtAnnDate(dateStr, timeStr) {
+  // Format announcement date: "2026-06-07" → "6月7日", + time label
+  const parts = [];
+  if (dateStr) {
+    const m = dateStr.slice(5, 7).replace(/^0/, '');
+    const d = dateStr.slice(8, 10).replace(/^0/, '');
+    parts.push(`${m}月${d}日`);
+  }
+  if (timeStr) {
+    const labels = { before_market: '盘前', during_market: '盘中', after_market: '盘后', weekend: '周末' };
+    parts.push(labels[timeStr] || timeStr);
+  }
+  return parts.join(' ');
+}
 
-  // prefer saved > system > light
-  var saved = localStorage.getItem(KEY);
-  if (saved) {
-    html.setAttribute('data-theme', saved);
-    btn.textContent = saved === 'dark' ? '☀️' : '🌙';
-  } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    html.setAttribute('data-theme', 'dark');
-    btn.textContent = '☀️';
+function updateStatus(text, dotColor) {
+  document.getElementById('statusText').textContent = text;
+  const dot = document.getElementById('connectionDot');
+  if (dotColor) dot.style.backgroundColor = dotColor;
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.remove('hidden', 'opacity-0');
+  toast.classList.add('opacity-100');
+  clearTimeout(toast._timeout);
+  toast._timeout = setTimeout(() => {
+    toast.classList.add('hidden', 'opacity-0');
+  }, 2500);
+}
+
+// MCP config — reused from original dashboard
+function copyMcpConfig() {
+  const config = JSON.stringify({
+    mcpServers: {
+      astockevent: {
+        type: "http",
+        url: window.location.origin + "/mcp",
+        description: "A股公告事件语义提取 — 13种事件类型 · 结构化JSON · 免费层50次/天"
+      }
+    }
+  }, null, 2);
+  navigator.clipboard.writeText(config).then(() => {
+    showToast('✅ MCP 配置已复制！粘贴到 Claude Desktop 的 claude_desktop_config.json 中');
+  }).catch(() => {
+    prompt('请手动复制以下 MCP 配置:', config);
+  });
+}
+
+// ============================================================
+// INIT
+// ============================================================
+function init() {
+  initDarkMode();
+
+  // Try cache first for instant render
+  const cached = sessionStorage.getItem(SS_KEY);
+  if (cached) {
+    try {
+      allEvents = JSON.parse(cached);
+      lastFetchTime = new Date(parseInt(sessionStorage.getItem(SS_KEY_TS) || '0'));
+      fetchError = null;
+      updateStatus(`缓存数据 — 更新于 ${fmtTime(lastFetchTime)}`, '#f59e0b');
+      refreshUI();
+    } catch (e) { /* corrupt */ }
   }
 
-  btn.addEventListener('click', function() {
-    var cur = html.getAttribute('data-theme');
-    var next = cur === 'dark' ? 'light' : 'dark';
-    html.setAttribute('data-theme', next);
-    btn.textContent = next === 'dark' ? '☀️' : '🌙';
-    localStorage.setItem(KEY, next);
-  });
-})();
+  // Fetch fresh data
+  fetchEvents();
+
+  // Infinite scroll: observe sentinel, auto-load when visible
+  const sentinel = document.getElementById('loadMore');
+  const observer = new IntersectionObserver((entries) => {
+    if (entries[0].isIntersecting) loadMore();
+  }, { rootMargin: '200px' });
+  observer.observe(sentinel);
+}
+
+// Auto-refresh every 5 minutes
+setInterval(fetchEvents, 5 * 60 * 1000);
+
+// Kick off
+document.addEventListener('DOMContentLoaded', init);
 </script>
 </body>
 </html>

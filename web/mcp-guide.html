@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AStockEvent MCP 接入指南 — 让 AI Agent 帮你盯 A 股公告</title>
+<meta name="description" content="手把手教你将 AStockEvent MCP 接入 Claude Desktop、Hermes Agent、Cursor、VSCode Copilot。一行命令 pip install astockevent，16 个 MCP 工具，13 种 A 股事件类型，免费额度可用。">
+<meta name="keywords" content="MCP,AStockEvent,A股,公告,事件,AI Agent,Claude Desktop,Hermes Agent,MCP Server,MCP配置,pip install astockevent,结构化事件,语义提取">
+<link rel="canonical" href="https://astockevent.com/mcp-guide">
+<meta property="og:title" content="AStockEvent MCP 接入指南 — 让 AI Agent 帮你盯 A 股公告">
+<meta property="og:description" content="一行命令 pip install astockevent，16 个 MCP 工具，13 种 A 股事件类型。Claude Desktop / Hermes Agent / Cursor / VSCode 全支持。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://astockevent.com/mcp-guide">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config={darkMode:'class',theme:{extend:{fontFamily:{sans:['Inter','system-ui','-apple-system','sans-serif']}}}}}</script>
+<style>
+  pre { overflow-x: auto; }
+  code { font-size: 0.875rem; }
+  .copy-btn { cursor: pointer; transition: all 0.2s; }
+  .copy-btn:hover { background: #374151; }
+</style>
+</head>
+<body class="bg-gray-50 text-gray-900 dark:bg-gray-900 dark:text-gray-100 min-h-screen">
+
+<!-- ════════════════════════════════════ HEADER ═══ -->
+<header class="sticky top-0 z-30 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+  <div class="max-w-4xl mx-auto flex items-center justify-between h-14 px-4">
+    <a href="/" class="font-bold text-lg">📊 AStockEvent</a>
+    <div class="flex items-center gap-4 text-sm">
+      <a href="/" class="text-gray-600 dark:text-gray-300 hover:text-blue-600">首页</a>
+      <a href="/register" class="text-blue-600 hover:underline font-medium">免费注册 →</a>
+    </div>
+  </div>
+</header>
+
+<!-- ════════════════════════════════════ ARTICLE ═══ -->
+<main class="max-w-4xl mx-auto px-4 py-8">
+<article>
+
+<h1 class="text-3xl font-bold mb-2">AStockEvent MCP 接入指南</h1>
+<p class="text-gray-500 dark:text-gray-400 mb-8">让 AI Agent 帮你实时盯 A 股公告 —— 一条命令，16 个工具，13 种事件类型</p>
+
+<!-- ═══════════ 目录 ═══════════ -->
+<nav class="bg-white dark:bg-gray-800 rounded-lg p-5 mb-8 border border-gray-200 dark:border-gray-700">
+  <h2 class="font-semibold mb-3">📑 目录</h2>
+  <ol class="list-decimal list-inside space-y-1 text-sm text-blue-600 dark:text-blue-400">
+    <li><a href="#what-is-mcp" class="hover:underline">什么是 MCP？为什么你需要它？</a></li>
+    <li><a href="#install" class="hover:underline">安装（30 秒）</a></li>
+    <li><a href="#get-key" class="hover:underline">获取 API Key（免费）</a></li>
+    <li><a href="#claude-desktop" class="hover:underline">接入 Claude Desktop</a></li>
+    <li><a href="#hermes" class="hover:underline">接入 Hermes Agent</a></li>
+    <li><a href="#cursor" class="hover:underline">接入 Cursor</a></li>
+    <li><a href="#vscode" class="hover:underline">接入 VSCode Copilot</a></li>
+    <li><a href="#tools" class="hover:underline">16 个 MCP 工具速览</a></li>
+    <li><a href="#examples" class="hover:underline">使用示例</a></li>
+    <li><a href="#faq" class="hover:underline">常见问题</a></li>
+  </ol>
+</nav>
+
+<!-- ═══════════ 1. What is MCP ═══════════ -->
+<section id="what-is-mcp" class="mb-10">
+  <h2 class="text-2xl font-bold mb-4">1. 什么是 MCP？</h2>
+
+  <p class="mb-3 leading-relaxed">
+    <strong>MCP（Model Context Protocol）</strong> 是 AI 世界的 "USB 接口"——让 AI Agent 能直接调用外部工具和数据源。
+  </p>
+
+  <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+    <p class="text-sm leading-relaxed">
+      <strong>没有 MCP：</strong>你问 Claude "川润股份最近有减持公告吗？"<br>
+      Claude 回答："我无法获取实时数据，建议你去巨潮资讯网查询。"<br><br>
+      <strong>有了 AStockEvent MCP：</strong>同一个问题<br>
+      Claude 自动调用 <code>search_events_by_stock</code> → 返回结构化结果 → "川润股份(002272) 6月8日发布减持预披露公告，股东XXX计划减持不超过X股，当前处于plan阶段，可信度 verified。"
+    </p>
+  </div>
+</section>
+
+<!-- ═══════════ 2. Install ═══════════ -->
+<section id="install" class="mb-10">
+  <h2 class="text-2xl font-bold mb-4">2. 安装（30 秒）</h2>
+
+  <p class="mb-3 leading-relaxed">需要 Python 3.11+。一行命令：</p>
+
+  <div class="relative bg-gray-900 text-gray-100 rounded-lg p-4 mb-3">
+    <button onclick="copyCode(this, 'pip install astockevent')" class="copy-btn absolute top-2 right-2 text-xs px-2 py-1 rounded bg-gray-700 text-gray-300">复制</button>
+    <pre><code>pip install astockevent</code></pre>
+  </div>
+
+  <p class="text-sm text-gray-500">验证安装：</p>
+  <div class="relative bg-gray-900 text-gray-100 rounded-lg p-4 mb-3">
+    <button onclick="copyCode(this, 'python -c \"import astockevent; print(astockevent.__version__)\"')" class="copy-btn absolute top-2 right-2 text-xs px-2 py-1 rounded bg-gray-700 text-gray-300">复制</button>
+    <pre><code>python -c "import astockevent; print(astockevent.__version__)"
+# → 0.2.1</code></pre>
+  </div>
+</section>
+
+<!-- ═══════════ 3. Get API Key ═══════════ -->
+<section id="get-key" class="mb-10">
+  <h2 class="text-2xl font-bold mb-4">3. 获取 API Key（免费）</h2>
+
+  <p class="mb-3 leading-relaxed">
+    访问 <a href="/register" class="text-blue-600 hover:underline font-medium">astockevent.com/register</a> 注册，即时获得免费 API Key。
+  </p>
+  <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+    <p class="text-sm"><strong>免费额度：</strong>100 次/天（未注册），200 次/天（注册后）。足以满足个人开发者日常使用。</p>
+  </div>
+</section>
+
+<!-- ═══════════ 4. Claude Desktop ═══════════ -->
+<section id="claude-desktop" class="mb-10">
+  <h2 class="text-2xl font-bold mb-4">4. 接入 Claude Desktop</h2>
+
+  <p class="mb-3 leading-relaxed">打开 <code>claude_desktop_config.json</code>（位置见下），添加：</p>
+
+  <div class="relative bg-gray-900 text-gray-100 rounded-lg p-4 mb-3">
+    <button onclick="copyCode(this, `{\n  \"mcpServers\": {\n    \"astockevent\": {\n      \"command\": \"python\",\n      \"args\": [\"-m\", \"astockevent.mcp\"],\n      \"env\": {\n        \"ASTOCKEVENT_API_KEY\": \"你的API Key\"\n      }\n    }\n  }\n}`)" class="copy-btn absolute top-2 right-2 text-xs px-2 py-1 rounded bg-gray-700 text-gray-300">复制</button>
+    <pre><code>{
+  "mcpServers": {
+    "astockevent": {
+      "command": "python",
+      "args": ["-m", "astockevent.mcp"],
+      "env": {
+        "ASTOCKEVENT_API_KEY": "你的API Key"
+      }
+    }
+  }
+}</code></pre>
+  </div>
+
+  <table class="w-full text-sm border-collapse">
+    <thead><tr class="bg-gray-100 dark:bg-gray-800"><th class="text-left p-2 border border-gray-200 dark:border-gray-700">系统</th><th class="text-left p-2 border border-gray-200 dark:border-gray-700">配置文件路径</th></tr></thead>
+    <tbody>
+      <tr><td class="p-2 border border-gray-200 dark:border-gray-700 font-mono text-xs">macOS</td><td class="p-2 border border-gray-200 dark:border-gray-700 font-mono text-xs">~/Library/Application Support/Claude/claude_desktop_config.json</td></tr>
+      <tr><td class="p-2 border border-gray-200 dark:border-gray-700 font-mono text-xs">Windows</td><td class="p-2 border border-gray-200 dark:border-gray-700 font-mono text-xs">%APPDATA%\Claude\claude_desktop_config.json</td></tr>
+    </tbody>
+  </table>
+  <p class="text-xs text-gray-400 mt-2">重启 Claude Desktop 后生效。工具栏会出现 🔌 图标，点击可查看 16 个工具。</p>
+</section>
+
+<!-- ═══════════ 5. Hermes Agent ═══════════ -->
+<section id="hermes" class="mb-10">
+  <h2 class="text-2xl font-bold mb-4">5. 接入 Hermes Agent</h2>
+
+  <p class="mb-3 leading-relaxed">编辑 <code>~/.hermes/config.yaml</code>，在 <code>mcp_servers:</code> 下添加：</p>
+
+  <div class="relative bg-gray-900 text-gray-100 rounded-lg p-4 mb-3">
+    <button onclick="copyCode(this, `mcp_servers:\n  astockevent:\n    command: \"python\"\n    args: [\"-m\", \"astockevent.mcp\"]\n    env:\n      ASTOCKEVENT_API_KEY: \"你的API Key\"")" class="copy-btn absolute top-2 right-2 text-xs px-2 py-1 rounded bg-gray-700 text-gray-300">复制</button>
+    <pre><code>mcp_servers:
+  astockevent:
+    command: "python"
+    args: ["-m", "astockevent.mcp"]
+    env:
+      ASTOCKEVENT_API_KEY: "你的API Key"</code></pre>
+  </div>
+
+  <p class="text-sm text-gray-500">重启 Hermes 或执行 <code>/reload-mcp</code> 即可生效。</p>
+</section>
+
+<!-- ═══════════ 6. Cursor ═══════════ -->
+<section id="cursor" class="mb-10">
+  <h2 class="text-2xl font-bold mb-4">6. 接入 Cursor</h2>
+
+  <p class="mb-3 leading-relaxed">Cursor 设置 → MCP → 添加新 Server：</p>
+
+  <div class="relative bg-gray-900 text-gray-100 rounded-lg p-4 mb-3">
+    <button onclick="copyCode(this, `{\n  \"mcpServers\": {\n    \"astockevent\": {\n      \"command\": \"python\",\n      \"args\": [\"-m\", \"astockevent.mcp\"],\n      \"env\": {\n        \"ASTOCKEVENT_API_KEY\": \"你的API Key\"\n      }\n    }\n  }\n}`)" class="copy-btn absolute top-2 right-2 text-xs px-2 py-1 rounded bg-gray-700 text-gray-300">复制</button>
+    <pre><code>{
+  "mcpServers": {
+    "astockevent": {
+      "command": "python",
+      "args": ["-m", "astockevent.mcp"],
+      "env": {
+        "ASTOCKEVENT_API_KEY": "你的API Key"
+      }
+    }
+  }
+}</code></pre>
+  </div>
+</section>
+
+<!-- ═══════════ 7. VSCode ═══════════ -->
+<section id="vscode" class="mb-10">
+  <h2 class="text-2xl font-bold mb-4">7. 接入 VSCode Copilot</h2>
+
+  <p class="mb-3 leading-relaxed">在 VSCode 设置中搜索 <code>mcp</code>，或直接编辑 <code>.vscode/mcp.json</code>：</p>
+
+  <div class="relative bg-gray-900 text-gray-100 rounded-lg p-4 mb-3">
+    <button onclick="copyCode(this, `{\n  \"mcp\": {\n    \"servers\": {\n      \"astockevent\": {\n        \"command\": \"python\",\n        \"args\": [\"-m\", \"astockevent.mcp\"],\n        \"env\": {\n          \"ASTOCKEVENT_API_KEY\": \"你的API Key\"\n        }\n      }\n    }\n  }\n}`)" class="copy-btn absolute top-2 right-2 text-xs px-2 py-1 rounded bg-gray-700 text-gray-300">复制</button>
+    <pre><code>{
+  "mcp": {
+    "servers": {
+      "astockevent": {
+        "command": "python",
+        "args": ["-m", "astockevent.mcp"],
+        "env": {
+          "ASTOCKEVENT_API_KEY": "你的API Key"
+        }
+      }
+    }
+  }
+}</code></pre>
+  </div>
+</section>
+
+<!-- ═══════════ 8. Tools Overview ═══════════ -->
+<section id="tools" class="mb-10">
+  <h2 class="text-2xl font-bold mb-4">8. 16 个 MCP 工具速览</h2>
+
+  <div class="overflow-x-auto">
+  <table class="w-full text-sm border-collapse">
+    <thead><tr class="bg-gray-100 dark:bg-gray-800"><th class="text-left p-2 border border-gray-200 dark:border-gray-700">分类</th><th class="text-left p-2 border border-gray-200 dark:border-gray-700">工具</th><th class="text-left p-2 border border-gray-200 dark:border-gray-700">用途</th></tr></thead>
+    <tbody>
+      <tr><td class="p-2 border font-medium" rowspan="7">🔍 核心查询</td><td class="p-2 border font-mono text-xs">search_events_by_stock</td><td class="p-2 border">按股票代码查事件</td></tr>
+      <tr><td class="p-2 border font-mono text-xs">search_events_by_type</td><td class="p-2 border">按事件类型全市场扫描</td></tr>
+      <tr><td class="p-2 border font-mono text-xs">search_events_by_shareholder</td><td class="p-2 border">按股东名称追踪</td></tr>
+      <tr><td class="p-2 border font-mono text-xs">search_events</td><td class="p-2 border"><strong>万能入口</strong> — 全部筛选器组合</td></tr>
+      <tr><td class="p-2 border font-mono text-xs">get_event_detail</td><td class="p-2 border">单条事件完整数据</td></tr>
+      <tr><td class="p-2 border font-mono text-xs">get_event_timeline</td><td class="p-2 border">事件生命周期时间线</td></tr>
+      <tr><td class="p-2 border font-mono text-xs">get_upcoming_events</td><td class="p-2 border">未来 N 天到期预警</td></tr>
+
+      <tr><td class="p-2 border font-medium" rowspan="7">🎯 专用入口</td><td class="p-2 border font-mono text-xs">search_dividend_events</td><td class="p-2 border">分红/送转</td></tr>
+      <tr><td class="p-2 border font-mono text-xs">search_violation_events</td><td class="p-2 border">违规处罚</td></tr>
+      <tr><td class="p-2 border font-mono text-xs">search_restructuring_events</td><td class="p-2 border">资产重组/并购</td></tr>
+      <tr><td class="p-2 border font-mono text-xs">search_shareholder_events</td><td class="p-2 border">股东行为全景</td></tr>
+      <tr><td class="p-2 border font-mono text-xs">search_risk_events</td><td class="p-2 border">风险预警</td></tr>
+      <tr><td class="p-2 border font-mono text-xs">search_regulatory_events</td><td class="p-2 border">监管信号</td></tr>
+      <tr><td class="p-2 border font-mono text-xs">search_cb_events</td><td class="p-2 border">可转债</td></tr>
+
+      <tr><td class="p-2 border font-medium" rowspan="2">🔬 穿透验证</td><td class="p-2 border font-mono text-xs">search_fund_events</td><td class="p-2 border">基金穿透 — 基金→重仓股×事件交叉</td></tr>
+      <tr><td class="p-2 border font-mono text-xs">get_trust_report</td><td class="p-2 border">可信度报告 — 多源交叉验证</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <p class="text-xs text-gray-400 mt-2">共 16 个工具，覆盖 13 种事件类型（减持/ST退市/监管函/限售解禁/回购/资产重组/停复牌/质押/业绩预告/增持/分红/违规处罚/可转债）。</p>
+</section>
+
+<!-- ═══════════ 9. Examples ═══════════ -->
+<section id="examples" class="mb-10">
+  <h2 class="text-2xl font-bold mb-4">9. 使用示例</h2>
+
+  <p class="mb-3 leading-relaxed">配置好 MCP 后，直接对 AI Agent 说人话：</p>
+
+  <div class="space-y-3">
+    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+      <p class="text-sm text-gray-500 mb-1">按股票查询减持</p>
+      <p class="font-medium">💬 "帮我查一下川润股份(002272)这周有没有减持公告"</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+      <p class="text-sm text-gray-500 mb-1">全市场 ST 风险扫描</p>
+      <p class="font-medium">💬 "最近全市场有哪些 ST / 退市风险预警？按严重程度排序"</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+      <p class="text-sm text-gray-500 mb-1">限售解禁提前预警</p>
+      <p class="font-medium">💬 "未来 7 天有哪些股票有限售股解禁？帮我列出解禁比例最大的前 10 只"</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+      <p class="text-sm text-gray-500 mb-1">可转债事件</p>
+      <p class="font-medium">💬 "最近有哪些可转债触发强赎？"</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+      <p class="text-sm text-gray-500 mb-1">基金穿透</p>
+      <p class="font-medium">💬 "华夏成长混合(000001)的重仓股最近有什么事件？按影响评分排序"</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+      <p class="text-sm text-gray-500 mb-1">可信度验证</p>
+      <p class="font-medium">💬 "这个减持事件的提取可信度如何？帮我查一下 trust report"</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════ 10. FAQ ═══════════ -->
+<section id="faq" class="mb-10">
+  <h2 class="text-2xl font-bold mb-4">10. 常见问题</h2>
+
+  <dl class="space-y-4">
+    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+      <dt class="font-semibold mb-1">Q: 国内能用吗？需要 VPN 吗？</dt>
+      <dd class="text-sm text-gray-600 dark:text-gray-400">AStockEvent MCP Server 本地运行，通过 HTTPS 连接 astockevent.com（香港服务器）。国内直连可用，无需 VPN。</dd>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+      <dt class="font-semibold mb-1">Q: 数据来源是什么？</dt>
+      <dd class="text-sm text-gray-600 dark:text-gray-400">巨潮资讯网(cninfo)、深交所(szse)、东方财富(eastmoney)、新浪财经(sina) 四源采集，多源交叉验证。</dd>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+      <dt class="font-semibold mb-1">Q: 支持哪些 AI Agent？</dt>
+      <dd class="text-sm text-gray-600 dark:text-gray-400">Claude Desktop、Hermes Agent、Cursor、VSCode Copilot，以及任何支持 MCP stdio 协议的 AI 客户端。</dd>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+      <dt class="font-semibold mb-1">Q: REST API 和 MCP 有什么区别？</dt>
+      <dd class="text-sm text-gray-600 dark:text-gray-400">REST API 适合程序化调用（Python/JS/Go 直接发 HTTP 请求）。MCP 适合 AI Agent 场景——Agent 自动发现工具、自动调用，你只需要说人话。两者共享同一后端数据和 API Key。</dd>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+      <dt class="font-semibold mb-1">Q: 不注册能用吗？</dt>
+      <dd class="text-sm text-gray-600 dark:text-gray-400">REST API 匿名访问 100 次/天。MCP 需要 API Key（在 astockevent.com/register 免费获取）。</dd>
+    </div>
+  </dl>
+</section>
+
+<!-- ═══════════ CTA ═══════════ -->
+<div class="bg-gradient-to-r from-blue-600 to-blue-800 rounded-xl p-8 text-white text-center mb-8">
+  <h2 class="text-xl font-bold mb-3">🚀 30 秒开始使用</h2>
+  <div class="bg-white/10 rounded-lg p-4 mb-4 text-left font-mono text-sm">
+    pip install astockevent
+  </div>
+  <div class="flex justify-center gap-4">
+    <a href="/register" class="bg-white text-blue-700 px-6 py-2 rounded-lg font-semibold hover:bg-blue-50 transition">免费注册获取 API Key →</a>
+    <a href="https://github.com/NengjiangLunpi/astockevent-mcp" target="_blank" rel="noopener" class="border border-white text-white px-6 py-2 rounded-lg font-semibold hover:bg-white/10 transition">⭐ GitHub</a>
+  </div>
+</div>
+
+</article>
+</main>
+
+<!-- ═══════════ FOOTER ═══════════ -->
+<footer class="border-t border-gray-200 dark:border-gray-700 py-6 text-center text-sm text-gray-400">
+  <p>📧 <a href="mailto:astockevent@outlook.com" class="hover:underline">astockevent@outlook.com</a> · <a href="/" class="hover:underline">astockevent.com</a> · <a href="https://github.com/NengjiangLunpi/astockevent-mcp" class="hover:underline">GitHub</a></p>
+</footer>
+
+<script>
+function copyCode(btn, text) {
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = '✅ 已复制';
+    setTimeout(() => { btn.textContent = '复制'; }, 2000);
+  }).catch(() => {
+    prompt('请手动复制:', text);
+  });
+}
+</script>
+
+</body>
+</html>
