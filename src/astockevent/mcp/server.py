@@ -1,4 +1,4 @@
-"""AStockEvent MCP Server — 16 Tools (REST API Proxy).
+"""AStockEvent MCP Server — 8 Tools (REST API Proxy).
 
 MCP Server for AI Agent consumption.
 Thin proxy layer: MCP stdio → HTTP → AStockEvent REST API → PostgreSQL.
@@ -8,23 +8,15 @@ Config:
   ASTOCKEVENT_API_URL  — REST API base URL (default: https://astockevent.com)
   ASTOCKEVENT_API_KEY  — API key for authenticated tier (optional; anonymous = free tier)
 
-Tools (16 total, Phase 2):
-  1. search_events_by_stock       — query by stock code(s)
-  2. search_events_by_type        — query by event type(s)
+Tools (8 total, Phase 2):
+  1. search_events_by_stock      — query by stock code(s)
+  2. search_events_by_type       — query by event type(s)
   3. search_events_by_shareholder — query by shareholder name
-  4. get_event_detail             — full event detail (was get_event_timeline)
+  4. get_event_detail            — full event detail (was get_event_timeline)
   5. get_event_timeline           — timeline entries for an event
   6. get_upcoming_events          — upcoming deadlines (unchanged)
   7. search_events                — universal escape hatch (DEV-59)
   8. get_trust_report             — trust/verification report (PO-14e)
-  9. search_dividend_events       — dividend events (DEV-87b)
- 10. search_violation_events      — violation & penalty events (DEV-87b)
- 11. search_restructuring_events  — asset restructuring events (DEV-87b)
- 12. search_shareholder_events    — shareholder behavior events (DEV-87b)
- 13. search_risk_events           — risk events (DEV-87b)
- 14. search_regulatory_events     — regulatory events (DEV-87b)
- 15. search_cb_events             — convertible bond events (G-21)
- 16. search_fund_events           — fund penetration events (F-7)
 """
 
 import json

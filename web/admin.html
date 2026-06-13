@@ -5,228 +5,295 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AStockEvent · 管理后台</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
-<style>
-  :root { --pico-font-size: 93.75%; }
-  body { max-width: 960px; margin: 0 auto; padding: 0 1rem; }
-  header { padding: 1.5rem 0 0.5rem; position: relative; }
-  .theme-toggle { position: absolute; top: 1.5rem; right: 0; background: none; border: 1px solid var(--pico-muted-border-color); border-radius: 8px; padding: 0.3rem 0.5rem; cursor: pointer; font-size: 1.1rem; line-height: 1; }
-  header h1 { font-size: 1.3rem; margin-bottom: 0.2rem; }
-  header nav { display: flex; flex-wrap: wrap; gap: 0.2rem; }
-  header nav a { font-size: 0.8rem; margin-right: 0.6rem; }
-  header nav a.current { font-weight: 700; text-decoration: underline; }
-  header nav a.soon { color: var(--pico-muted-color); cursor: not-allowed; text-decoration: line-through; }
-  header nav .sep { color: var(--pico-muted-color); font-size: 0.8rem; margin: 0 0.2rem; }
-
-  /* Stat cards row */
-  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; }
-  .stat-card { padding: 1rem; text-align: center; border: 1px solid var(--pico-muted-border-color); border-radius: 8px; }
-  .stat-card .num { font-size: 1.6rem; font-weight: 700; line-height: 1.2; }
-  .stat-card .label { font-size: 0.75rem; color: var(--pico-muted-color); margin-top: 0.2rem; }
-
-  /* Function grid */
-  .func-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.9rem; }
-  .func-card { padding: 1.2rem; border: 1px solid var(--pico-muted-border-color); border-radius: 10px; text-decoration: none; color: inherit; transition: border-color 0.2s, box-shadow 0.2s; display: block; }
-  .func-card:hover { border-color: var(--pico-primary); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-  .func-card.disabled { opacity: 0.55; pointer-events: none; }
-  .func-card .icon { font-size: 1.5rem; margin-bottom: 0.4rem; }
-  .func-card h3 { font-size: 0.95rem; margin-bottom: 0.3rem; }
-  .func-card p { font-size: 0.8rem; color: var(--pico-muted-color); margin: 0; }
-  .func-card .tag { display: inline-block; font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 3px; margin-top: 0.5rem; }
-  .tag-ready { background: #d5f5e3; color: #1e8449; }
-  .tag-soon { background: #fef9e7; color: #927608; }
-
-  .login-box { max-width: 320px; margin: 4rem auto; text-align: center; }
-  .loading { text-align: center; color: var(--pico-muted-color); padding: 2rem; }
-  footer { text-align: center; padding: 2rem 0; font-size: 0.75rem; color: var(--pico-muted-color); }
-</style>
+<link rel="stylesheet" href="/admin.css">
 </head>
 <body>
-<header>
-  <button class="theme-toggle" id="themeToggle" title="切换深色模式" aria-label="切换深色模式">🌙</button>
-  <h1>AStockEvent 管理后台</h1>
-  <nav>
-    <a href="/">看板</a>
-    <a href="/admin" class="current">管理</a>
-    <a href="/status">状态</a>
-    <a href="/report">报告</a>
-    <a href="/review">审核</a>
-    <span class="sep">|</span>
-    <a href="#" class="soon">存档</a>
-    <a href="#" class="soon">存储</a>
+
+<!-- ====== Sidebar ====== -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <span class="brand-icon">📊</span>
+    <span class="brand-text">AStockEvent</span>
+  </div>
+  <nav id="sideNav">
+    <!-- Dashboard (top-level) -->
+    <a href="#dashboard" data-section="dashboard" class="active">
+      <span class="nav-icon">📋</span><span class="nav-label">总览</span>
+    </a>
+
+    <!-- Pipeline Group -->
+    <div class="sidebar-group">
+      <div class="sidebar-group-header">📡 管线监控</div>
+      <a href="#sources" data-section="sources">
+        <span class="nav-icon">📡</span><span class="nav-label">数据源状态</span>
+      </a>
+      <a href="#cycles" data-section="cycles">
+        <span class="nav-icon">🔄</span><span class="nav-label">采集历史</span>
+      </a>
+      <a href="#archive" data-section="archive">
+        <span class="nav-icon">📦</span><span class="nav-label">归档进度</span>
+      </a>
+    </div>
+
+    <!-- Quality Group -->
+    <div class="sidebar-group">
+      <div class="sidebar-group-header">🔍 质量保障</div>
+      <a href="#reviews" data-section="reviews">
+        <span class="nav-icon">🔍</span><span class="nav-label">提取审核</span>
+        <span class="nav-badge badge-warn" id="reviewBadge" style="display:none">0</span>
+      </a>
+      <a href="#golden" data-section="golden">
+        <span class="nav-icon">🏅</span><span class="nav-label">Golden 标注</span>
+      </a>
+      <a href="#smoke-test" data-section="smoke-test">
+        <span class="nav-icon">🔬</span><span class="nav-label">冒烟测试</span>
+      </a>
+    </div>
+
+    <!-- Infrastructure Group -->
+    <div class="sidebar-group">
+      <div class="sidebar-group-header">🖥 基础设施</div>
+      <a href="#topology" data-section="topology">
+        <span class="nav-icon">🗺️</span><span class="nav-label">节点拓扑</span>
+      </a>
+      <a href="#workers" data-section="workers">
+        <span class="nav-icon">🖥</span><span class="nav-label">Worker 监控</span>
+      </a>
+      <a href="#health" data-section="health">
+        <span class="nav-icon">❤️</span><span class="nav-label">健康检查</span>
+      </a>
+    </div>
+
+    <!-- Insights Group -->
+    <div class="sidebar-group">
+      <div class="sidebar-group-header">📈 数据洞察</div>
+      <a href="#report" data-section="report">
+        <span class="nav-icon">📈</span><span class="nav-label">日报</span>
+      </a>
+      <a href="#llm" data-section="llm">
+        <span class="nav-icon">🤖</span><span class="nav-label">LLM 消耗</span>
+      </a>
+      <a href="#feed" data-section="feed">
+        <span class="nav-icon">📰</span><span class="nav-label">Event Feed</span>
+      </a>
+    </div>
+
+    <!-- System Group -->
+    <div class="sidebar-group">
+      <div class="sidebar-group-header">⚙️ 系统管理</div>
+      <a href="#crawler" data-section="crawler">
+        <span class="nav-icon">🎮</span><span class="nav-label">爬虫控制</span>
+      </a>
+      <a href="#api-keys" data-section="api-keys">
+        <span class="nav-icon">🔑</span><span class="nav-label">API 密钥</span>
+      </a>
+      <a href="#db-browser" data-section="db-browser">
+        <span class="nav-icon">🗄</span><span class="nav-label">数据浏览</span>
+      </a>
+      <a href="#system-info" data-section="system-info">
+        <span class="nav-icon">⚙️</span><span class="nav-label">系统信息</span>
+      </a>
+    </div>
   </nav>
-</header>
+  <div class="sidebar-footer">
+    <button id="themeToggle" title="切换主题">🌙</button>
+    <span style="font-size:0.75rem;color:var(--pico-muted-color)">主题</span>
+  </div>
+</aside>
 
-<main id="main">
-  <div class="loading">加载中...</div>
-</main>
+<!-- ====== Content ====== -->
+<div class="content" id="contentArea">
+  <div class="top-bar">
+    <button class="sidebar-toggle" id="menuToggle" aria-label="菜单">☰</button>
+    <h1 id="sectionTitle">总览</h1>
+  </div>
 
-<footer>AStockEvent Admin · 仅限授权访问</footer>
+  <!-- Dashboard -->
+  <section class="section active" id="sec-dashboard">
+    <div id="dashboardContent"><div class="loading">加载中...</div></div>
+  </section>
 
-<div id="loginForm" style="display:none">
-  <div class="login-box">
-    <h3>管理员登录</h3>
+  <!-- Pipeline -->
+  <section class="section" id="sec-sources"><div id="sourcesContent"><div class="loading">加载中...</div></div></section>
+  <section class="section" id="sec-cycles"><div id="cyclesContent"><div class="loading">加载中...</div></div></section>
+  <section class="section" id="sec-archive"><div id="archiveContent"><div class="loading">加载中...</div></div></section>
+
+  <!-- Quality -->
+  <section class="section" id="sec-reviews"><div id="reviewsContent"><div class="loading">加载中...</div></div></section>
+  <section class="section" id="sec-golden"><div id="goldenContent"><div class="loading">加载中...</div></div></section>
+  <section class="section" id="sec-smoke-test"><div id="smokeTestContent"><div class="loading">加载中...</div></div></section>
+
+  <!-- Infrastructure -->
+  <section class="section" id="sec-topology"><div id="topologyContent"><div class="loading">加载中...</div></div></section>
+  <section class="section" id="sec-workers"><div id="workersContent"><div class="loading">加载中...</div></div></section>
+  <section class="section" id="sec-health"><div id="healthContent"><div class="loading">加载中...</div></div></section>
+
+  <!-- Insights -->
+  <section class="section" id="sec-report"><div id="reportContent"><div class="loading">加载中...</div></div></section>
+  <section class="section" id="sec-llm"><div id="llmContent"><div class="loading">加载中...</div></div></section>
+  <section class="section" id="sec-feed"><div id="feedContent"><div class="loading">加载中...</div></div></section>
+
+  <!-- System -->
+  <section class="section" id="sec-crawler"><div id="crawlerContent"><div class="loading">加载中...</div></div></section>
+  <section class="section" id="sec-api-keys"><div id="apiKeysContent"><div class="loading">加载中...</div></div></section>
+  <section class="section" id="sec-db-browser"><div id="dbBrowserContent"><div class="loading">加载中...</div></div></section>
+  <section class="section" id="sec-system-info"><div id="systemInfoContent"><div class="loading">加载中...</div></div></section>
+
+  <footer>AStockEvent Admin · 统一管理后台</footer>
+</div>
+
+<!-- ====== Login Modal ====== -->
+<div class="modal-overlay" id="loginModal">
+  <div class="modal-box">
+    <h3>🔐 管理员登录</h3>
     <form id="authForm">
-      <input type="text" id="username" placeholder="用户名" required>
-      <input type="password" id="password" placeholder="密码" required>
+      <input type="text" id="username" placeholder="用户名" required autocomplete="username">
+      <input type="password" id="password" placeholder="密码" required autocomplete="current-password">
       <button type="submit">登录</button>
     </form>
+    <p style="font-size:0.75rem;color:var(--pico-muted-color);margin-top:0.8rem">仅限授权管理员访问</p>
   </div>
 </div>
 
+<!-- ====== Toast ====== -->
+<div class="toast" id="toast"></div>
+
+<!-- ====== JS Modules (order matters) ====== -->
+<script src="/js/admin-utils.js?v=0609f"></script>
+<script src="/js/admin-dashboard.js?v=0609f"></script>
+<script src="/js/admin-pipeline.js?v=0609f"></script>
+<script src="/js/admin-quality.js?v=0609f"></script>
+<script src="/js/admin-infrastructure.js?v=0610b"></script>
+<script src="/js/admin-insights.js?v=0609f"></script>
+<script src="/js/admin-system.js?v=0609f"></script>
+
+<!-- ====== Bootstrap: Router + Init ====== -->
 <script>
-var AUTH_KEY = 'dp_admin_auth';
-
-function getAuth() {
-  return sessionStorage.getItem(AUTH_KEY);
-}
-
-function setAuth(u, p) {
-  sessionStorage.setItem(AUTH_KEY, 'Basic ' + btoa(u + ':' + p));
-}
-
-function apiFetch(url) {
-  var headers = {};
-  var auth = getAuth();
-  if (auth) headers['Authorization'] = auth;
-  return fetch(url, { headers: headers }).then(function(r) {
-    if (r.status === 401) { sessionStorage.removeItem(AUTH_KEY); showLogin(); throw new Error('unauthorized'); }
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return r.json();
-  });
-}
-
-function showLogin() {
-  document.getElementById('main').innerHTML = '';
-  document.getElementById('loginForm').style.display = 'block';
-}
-
-document.getElementById('authForm').addEventListener('submit', function(e) {
-  e.preventDefault();
-  var u = document.getElementById('username').value;
-  var p = document.getElementById('password').value;
-  setAuth(u, p);
-  document.getElementById('loginForm').style.display = 'none';
-  load();
-});
-
-function load() {
-  var main = document.getElementById('main');
-  main.innerHTML = '<div class="loading">加载中...</div>';
-
-  // Fetch status + review summary in parallel
-  Promise.allSettled([
-    apiFetch('/api/status'),
-    apiFetch('/api/reviews/summary')
-  ]).then(function(results) {
-    var status = results[0].status === 'fulfilled' ? results[0].value : null;
-    var reviews = results[1].status === 'fulfilled' ? results[1].value : null;
-
-    var eventCount = status ? (status.database ? status.database.event_count : '—') : '—';
-    var rawCount = status && status.archive ? status.archive.total_raw_announcements : '—';
-    var archPct = status && status.archive ? (status.archive.completion_pct || 0) : 0;
-    var schedulerRunning = status && status.scheduler ? status.scheduler.running : false;
-    var pendingReviews = reviews ? (reviews.by_status && reviews.by_status.pending || 0) : '—';
-    var totalReviews = reviews ? (reviews.by_status ? Object.values(reviews.by_status).reduce(function(a,b){return a+b;}, 0) : '—') : '—';
-
-    // === Stat cards ===
-    var html = '<div class="stat-row">' +
-      statCard(eventCount, 'Event 总数') +
-      statCard(pendingReviews, '待审核') +
-      statCard(rawCount, '归档公告') +
-      statCard(archPct + '%', 'Archive 进度') +
-      statCard(schedulerRunning ? '运行中' : '已停止', '调度器', schedulerRunning ? '#27ae60' : '#c0392b') +
-      '</div>';
-
-    // === Pipeline status quick glance ===
-    if (status && status.pipeline) {
-      var pl = status.pipeline;
-      var lastCycles = pl.last_cycles || [];
-      var lastOk = lastCycles.length > 0 ? lastCycles[0].status === 'ok' : null;
-      var lastTime = lastCycles.length > 0 ? new Date(lastCycles[0].time).toLocaleTimeString('zh-CN', {hour12:false}) : '—';
-      html += '<p style="font-size:0.82rem;color:var(--pico-muted-color);margin-bottom:1.2rem">' +
-        '最近管线: <span style="color:' + (lastOk ? '#27ae60' : '#c0392b') + '">' +
-        (lastOk ? '正常' : '异常') + '</span>' +
-        ' · ' + lastTime +
-        ' · 24h 周期: ' + (pl.last_cycles ? pl.last_cycles.length : '—') + ' 次' +
-        '</p>';
-    }
-
-    // === Function grid ===
-    html += '<div class="func-grid">';
-
-    // Status
-    html += funcCard('/status', '📊', '系统状态', '调度器运行状态、数据库连接、管线周期、Archive 回溯进度', 'tag-ready', '已上线');
-
-    // Report
-    html += funcCard('/report', '📈', '数据报告', '24h Event 类型分布、置信度统计、LLM Token 消耗、Archive 完成率', 'tag-ready', '已上线');
-
-    // Review
-    html += funcCard('/review', '🔍', '提取审核', 'Regex vs LLM 冲突裁决、Golden Dataset 积淀、人工标注', 'tag-ready', '已上线');
-
-    // Archive (future)
-    html += funcCardDisabled('📦', '数据存档', '历史公告全量采集：2020-2026 元数据 + 全文下载 + 进度追踪', 'tag-soon', '即将上线');
-
-    // Storage (future)
-    html += funcCardDisabled('💾', '存储管理', 'OSS 用量统计、各 tier 数据分布、月度费用预估、备份状态', 'tag-soon', '即将上线');
-
-    html += '</div>';
-
-    main.innerHTML = html;
-  }).catch(function(err) {
-    if (err.message === 'unauthorized') return;
-    main.innerHTML = '<div class="error-msg" style="text-align:center;padding:3rem;color:#c0392b">' +
-      '加载失败: ' + err.message + '<br><small>请检查服务器是否正常运行</small></div>';
-  });
-}
-
-function statCard(value, label, color) {
-  return '<div class="stat-card">' +
-    '<div class="num" style="' + (color ? 'color:' + color : '') + '">' + value + '</div>' +
-    '<div class="label">' + label + '</div></div>';
-}
-
-function funcCard(href, icon, title, desc, tagClass, tagText) {
-  return '<a href="' + href + '" class="func-card">' +
-    '<div class="icon">' + icon + '</div>' +
-    '<h3>' + title + '</h3>' +
-    '<p>' + desc + '</p>' +
-    '<span class="tag ' + tagClass + '">' + tagText + '</span>' +
-    '</a>';
-}
-
-function funcCardDisabled(icon, title, desc, tagClass, tagText) {
-  return '<div class="func-card disabled">' +
-    '<div class="icon">' + icon + '</div>' +
-    '<h3>' + title + '</h3>' +
-    '<p>' + desc + '</p>' +
-    '<span class="tag ' + tagClass + '">' + tagText + '</span>' +
-    '</div>';
-}
-
-// init
-if (!getAuth()) { showLogin(); } else { load(); }
-
-/* ====== dark mode ====== */
 (function() {
-  var KEY = 'dp_theme';
-  var html = document.documentElement;
-  var btn = document.getElementById('themeToggle');
-  if (!btn) return;
-  var saved = localStorage.getItem(KEY);
-  if (saved) {
-    html.setAttribute('data-theme', saved);
-    btn.textContent = saved === 'dark' ? '☀️' : '🌙';
-  } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    html.setAttribute('data-theme', 'dark');
-    btn.textContent = '☀️';
-  }
-  btn.addEventListener('click', function() {
-    var cur = html.getAttribute('data-theme');
-    var next = cur === 'dark' ? 'light' : 'dark';
-    html.setAttribute('data-theme', next);
-    btn.textContent = next === 'dark' ? '☀️' : '🌙';
-    localStorage.setItem(KEY, next);
+  'use strict';
+  var A = window.Admin;
+
+  // ---- Section title map ----
+  var SECTION_TITLES = {
+    dashboard: '📊 总览',
+    sources: '📡 数据源状态', cycles: '🔄 采集历史', archive: '📦 归档进度',
+    reviews: '🔍 提取审核', golden: '🏅 Golden 标注', 'smoke-test': '🔬 冒烟测试',
+    topology: '🗺️ 节点拓扑', workers: '🖥 Worker 监控', health: '❤️ 健康检查',
+    report: '📈 日报', llm: '🤖 LLM 消耗', feed: '📰 Event Feed',
+    crawler: '🎮 爬虫控制', 'api-keys': '🔑 API 密钥', 'db-browser': '🗄 数据浏览', 'system-info': '⚙️ 系统信息'
+  };
+
+  var currentSection = '';
+
+  // ---- Router ----
+  var router = {
+    current: '',
+    navigate: function(section) {
+      var cfg = A.getSection(section);
+      if (!cfg) { section = 'dashboard'; cfg = A.getSection('dashboard'); }
+      if (this.current === section) return;
+      this.current = section;
+
+      // Update sidebar
+      document.querySelectorAll('#sideNav a').forEach(function(a) { a.classList.remove('active'); });
+      var link = document.querySelector('#sideNav a[data-section="' + section + '"]');
+      if (link) link.classList.add('active');
+
+      // Update section visibility
+      document.querySelectorAll('.section').forEach(function(s) { s.classList.remove('active'); });
+      var sec = document.getElementById('sec-' + section);
+      if (sec) sec.classList.add('active');
+
+      // Update title
+      document.getElementById('sectionTitle').textContent = SECTION_TITLES[section] || section;
+
+      // Close mobile sidebar
+      document.getElementById('sidebar').classList.remove('open');
+
+      // Check auth (skip for feed which is public)
+      if (!cfg.noAuth && !A.getAuth()) { A.showLogin(); return; }
+      A.hideLogin();
+
+      // Render
+      var contentEl = document.getElementById(section + 'Content');
+      if (contentEl && cfg.render) {
+        cfg.render(contentEl);
+      }
+    }
+  };
+  A.router = router;
+
+  // ---- Auth ----
+  document.getElementById('authForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    var u = document.getElementById('username').value;
+    var p = document.getElementById('password').value;
+    A.setAuth(u, p);
+    A.hideLogin();
+    var hash = location.hash || '#dashboard';
+    router.navigate(hash.replace('#', ''));
   });
+
+  // ---- Theme ----
+  (function() {
+    var KEY = 'dp_theme';
+    var html = document.documentElement;
+    var btn = document.getElementById('themeToggle');
+    var saved = localStorage.getItem(KEY);
+    if (saved) { html.setAttribute('data-theme', saved); btn.textContent = saved === 'dark' ? '☀️' : '🌙'; }
+    else if (window.matchMedia('(prefers-color-scheme: dark)').matches) { html.setAttribute('data-theme', 'dark'); btn.textContent = '☀️'; }
+    btn.addEventListener('click', function() {
+      var cur = html.getAttribute('data-theme');
+      var next = cur === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      btn.textContent = next === 'dark' ? '☀️' : '🌙';
+      localStorage.setItem(KEY, next);
+    });
+  })();
+
+  // ---- Mobile menu ----
+  document.getElementById('menuToggle').addEventListener('click', function() {
+    document.getElementById('sidebar').classList.toggle('open');
+  });
+
+  // ---- Hash change ----
+  window.addEventListener('hashchange', function() {
+    var section = (location.hash || '#dashboard').replace('#', '');
+    router.navigate(section);
+  });
+
+  // ---- Init ----
+  var hash = (location.hash || '#dashboard').replace('#', '');
+  if (!A.getSection(hash)) hash = 'dashboard';
+
+  if (!A.getAuth()) {
+    A.showLogin();
+    router.navigate(hash);
+  } else {
+    A.hideLogin();
+    router.navigate(hash);
+  }
+
+  // ---- Auto-refresh review badge ----
+  setInterval(function() {
+    if (!A.getAuth()) return;
+    A.apiFetch('/api/reviews/summary').then(function(r) {
+      var pending = (r.by_status && r.by_status.pending) || 0;
+      var badge = document.getElementById('reviewBadge');
+      if (badge) {
+        badge.textContent = pending;
+        badge.style.display = pending > 0 ? 'inline' : 'none';
+      }
+    }).catch(function() {});
+  }, 60000);
+
+  // ---- Auto-refresh health on dashboard ----
+  setInterval(function() {
+    if (router.current === 'dashboard' && A.getAuth()) {
+      router.navigate('dashboard');
+    }
+  }, 120000);
+
 })();
 </script>
 </body>
