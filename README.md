@@ -84,7 +84,7 @@ attribution of price moves. What you build on top of the facts is yours.
 
 Pre-release. Coverage is narrow and stated honestly; the API may change.
 If you are using it and something is missing or wrong, we want to hear it —
-[tell us here](https://astockevent.com/feedback) or email `astockevent@outlook.com`.
+[tell us here](https://astockevent.com/feedback) or email `contact@astockevent.com`.
 
 ## About this repository
 

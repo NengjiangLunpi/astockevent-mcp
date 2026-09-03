@@ -13,7 +13,7 @@ description = "AStockEvent is now a remote MCP server — point your client at h
 readme = "README.md"
 license = "MIT"
 authors = [
-    {name = "AStockEvent", email = "astockevent@outlook.com"},
+    {name = "AStockEvent", email = "contact@astockevent.com"},
 ]
 keywords = ["mcp", "a-share", "financial-data", "announcement", "ai-agent"]
 classifiers = [
