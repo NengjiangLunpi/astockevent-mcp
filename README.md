@@ -25,7 +25,7 @@ https://astockevent.com/mcp/
 No API key, no sign-up. Rate limits apply and the response tells you when you hit one.
 
 <details>
-<summary>Claude Desktop / any client that takes a remote URL</summary>
+<summary>Example for clients with a URL-based mcpServers configuration</summary>
 
 ```json
 {
@@ -49,21 +49,36 @@ contract at [`/openapi.json`](https://astockevent.com/openapi.json).
 | Tool | What it answers |
 |---|---|
 | `list_coverage` | What is in scope and what the limits are. Call this before concluding data is missing. |
-| `get_entity_state` | Folded state for a company, or for a shareholder across every company they touch. |
+| `list_company_filings` | Filings held for one company, with source links and any extracted events; up to 50 per call, without list pagination. |
+| `get_filing_parsed` | Available parsed text and tables for one recent filing; long documents may be partial. |
+| `get_related_filings` | Collected filings of the same company matched by explicit document references. |
+| `get_entity_state` | Folded company state, or linked companies for a confirmed actor identifier. |
 | `get_event_with_context` | One event plus its whole timeline, in a single call. |
-| `whats_new` | What changed recently, cursor-paged. |
-| `scan_recent_events` | Cross-company scan by filing type and date range. |
+| `whats_new` | Events updated within seven days and linked to filings from the last seven Beijing calendar days, cursor-paged. |
+| `scan_recent_events` | Cross-company discovery by filing type within the last seven Beijing calendar days. |
+
+Discovery includes today and uses filing dates, not the age of the case. A new filing can mention an old case. `matched_filing` identifies the qualifying filing and its source; root event fields describe current context. Empty windows stay empty. Scan returns effective dates, a matched count and truncation flag, with at most 100 events per page. Continue with `cursor` until it is null; `truncated` may still be true on the last page because it compares the total with that page’s size. Omit dates/phase on continuation or repeat the effective values; changing filters requires a fresh query. Expired windows are errors, never a way into history. Results can change between pages; restart polling from the first page and deduplicate by event id. Known company/entity/event queries retain their existing historical context.
+
+Parsed text is available for filings dated at most seven Beijing calendar days ago
+(eight dates including today), in chunks of up to 50,000 characters. Source documents
+may be only partly parsed: reaching the last stored chunk does not mean the full PDF
+was parsed. Use the source PDF whenever you need the complete original.
 
 ## Coverage
 
-**Three filing types today**, stated plainly — more are being added. We would rather
-tell you the boundary than let you discover it by trial and error.
+**Four structured event types**, with broader company-filing and source-document access.
+The coverage endpoint states the current scope and limits.
 
 | Type | Folded into |
 |---|---|
 | Share reduction by major shareholders | The plan that is still live, and how much of its cap is used up |
 | Administrative penalty proceedings | Each case grouped by case number, folded to its current stage |
 | Exchange inquiry letters | Received / replied / overdue — the state of the conversation |
+| Ordinary A-share trading halts and resumptions | Individual halt cycles, reasons and dates, available through event details and recent discovery |
+
+Company folded state covers reductions, penalties and regulatory letters. Stock halt
+cycles are available through filings, event details and scans; they are not folded
+into company state. Convertible-bond and preferred-share halts are outside this scope.
 
 Call `list_coverage` for the authoritative, always-current answer.
 

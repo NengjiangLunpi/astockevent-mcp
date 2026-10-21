@@ -1,7 +1,8 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "com.astockevent/astockevent",
-  "description": "Current state from Chinese A-share filings: reductions, penalties, inquiries. Source-linked.",
+  "title": "AStockEvent",
+  "description": "A-share filings: reductions, penalties, regulatory letters and stock halts. Source-linked facts.",
   "version": "0.1.0",
   "websiteUrl": "https://astockevent.com",
   "repository": {
